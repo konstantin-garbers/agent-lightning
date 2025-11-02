@@ -5,17 +5,17 @@ from __future__ import annotations
 import uuid
 import os
 import random
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, cast, Literal
 from langchain_core.prompts import ChatPromptTemplate
 
 import pandas as pd
 
 from langchain.chat_models import init_chat_model
-from langgraph.graph import END, START, MessagesState, StateGraph
-from langchain_core.messages import AnyMessage
+from langgraph.graph import START, END, MessagesState, StateGraph
+from langchain_core.messages import AIMessage, ToolMessage 
 from langgraph.graph.state import CompiledStateGraph
 
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.client import MultiServerMCPClient, BaseTool
 
 from agentlightning import Trainer, LitAgent, configure_logger, LLM
 
@@ -23,20 +23,29 @@ from dotenv import load_dotenv
 
 logger = configure_logger()
 
-'''
-TODO:
-- Multi sesssion support
+"""
+Demos: https://docs.langchain.com/oss/python/langgraph/workflows-agents
+
+- Better error handling
+- Additional states for planning
+- 
+Urgent TODO:
+- Multi session support
 - Debug mode
-- Better error handling 
 - Image attachment
-- Additional states to 1. capture initial state and 2. create plan
-- Capture plan
-'''
+
+Future TODO:
+- Better error handling
+- Additional states for planning
+- Initial state to capture the initial GUI state
+"""
+
+SERVER_NAME = "edgebox-sandbox"
 
 # https://github.com/langchain-ai/langchain-mcp-adapters?tab=readme-ov-file#using-with-langgraph-stategraph
 client = MultiServerMCPClient(
     {
-        "edgebox-sandbox": {
+        SERVER_NAME: {
             "transport": "streamable_http",
             "url": "http://localhost:8888/mcp",
         }
@@ -44,7 +53,7 @@ client = MultiServerMCPClient(
 )
 
 # TODO: Append Tool Message Calls, e.g. what was returned after each tool use
-PERFORM_GUI_ACTION_PROMPT = ChatPromptTemplate(
+AGENT_PROMPT = ChatPromptTemplate(
     [
         (
             "system",
@@ -61,7 +70,6 @@ class State(MessagesState):
     execution: str  # Contains the image of the last evaluation of the last evaluation
     feedback: str  # Feedback from evaluation
     num_turns: int
-    messages: list[AnyMessage]
 
 
 # TODO: Every agent instance should have their own session id and use it to call the model
@@ -74,8 +82,9 @@ class MultiModalAgent:
     ):
         self.debug = debug
         self.max_turns = max_turns
-        self.model_name: str = os.environ.get("MODEL", "Qwen/Qwen2.5-VL-32B-Instruct")
+        self.model_name: str = os.environ.get("MODEL", "deepseek-ai/DeepSeek-V2.5")
         self.session_id: str = str(uuid.uuid4())
+        self.session = None
         self.llm = init_chat_model(
             self.model_name,
             model_provider="openai",
@@ -86,55 +95,88 @@ class MultiModalAgent:
             max_tokens=2048,
         )
 
-    async def invoke_prompt(self, prompt: Any) -> AnyMessage:
-        print("Invoking prompt...")
+    def _filter_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
+        ACCEPTED_TOOL_NAME_LIST = [
+            "desktop_mouse_click",
+            "desktop_mouse_double_click",
+            "desktop_mouse_move",
+            "desktop_mouse_scroll",
+            "desktop_mouse_drag",
+            "desktop_screenshot",
+            "desktop_switch_window",
+            "desktop_get_windows",
+            "desktop_keyboard_type",
+        ]
+
+        result: list[BaseTool] = []
+        for tool in tools:
+            name = tool.get_name()
+            if name in ACCEPTED_TOOL_NAME_LIST:
+                result.append(tool)
+
+        return result
+
+    async def agent_node(self, state: State) -> dict["str", Any]:
         try:
-            tools = await client.get_tools()
-            logger.info(f"Loaded tools: {[tool.name for tool in tools]}")
-            print("Loaded tools:", [tool.name for tool in tools])
-            result = await self.llm.bind_tools(tools).ainvoke(prompt)  # type: ignore
+            prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
+                {
+                    "task": state["task"],  # type: ignore
+                    "messages": state.get("messages", []),  # type: ignore
+                }
+            )
+
+            tools: list[BaseTool] = await client.get_tools()
+            tools = self._filter_tools(tools)
+
+            result = await self.llm.bind_tools(tools=tools, tool_choice="any").ainvoke(prompt)  # type: ignore
+
+            logger.info(result)
+            return {"messages": [result]}
+
         except Exception as e:
-            logger.error(f"Failed to invoke prompt: {e}")
+            err_msg = f"Agent node failed in session {self.session_id}: {e}"
+            logger.exception(err_msg)
+            raise
 
-        return result  # type: ignore
+    async def tool_node(self, state: State) -> dict["str", Any]:
+        last_message = cast(AIMessage, state["messages"][-1])  # type: ignore
+        for tool_call in last_message.tool_calls:  # type: ignore
+            async with client.session(SERVER_NAME) as session:
+                result = await session.call_tool(tool_call["name"], tool_call["args"])
+                # TODO: Convert to ToolMessage
 
-    def should_continue(self, state: State) -> Literal[END, "generate_action"]:  # type: ignore
-        """Determine if the agent should continue based on the result."""
-        return "generate_action"
+                return {
+                    "messages": [result]
+                }
 
-    async def perform_gui_action(self, state: State) -> State:
-        prompt: Any = PERFORM_GUI_ACTION_PROMPT.invoke( # type: ignore
-            {
-                "task": state["task"], # type: ignore
-                "messages": state.get("messages", []) # type: ignore
-            }
-        )
-        result = await self.invoke_prompt(prompt)
-        print(result)
-        return state
+        return {}
 
-    def check_gui_action(self, state: State) -> State:
-        """Check the result of the GUI action."""
-        return state
+    async def evaluate_node(self, state: State) -> dict["str", Any]:
+        return {}
 
-    def create_plan(self, state: State) -> State:
-        """Create a plan for the next action."""
-        return state
+    def should_evaluate(self, state: MessagesState) -> Literal["tool_node", "evaluate_node"]:
+        """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
+
+        messages = state["messages"]
+        last_message = messages[-1]
+
+        if last_message.tool_calls:  # type: ignore
+            return "tool_node"
+
+        return "evaluate_node"
 
     def graph(self) -> CompiledStateGraph[State]:
-        logger.info("Building agent graph...")
         builder = StateGraph(State)
-        builder.add_node(self.perform_gui_action)  # type: ignore
-        # builder.add_node(self.check_gui_action)  # type: ignore
-        # builder.add_node(self.create_plan)  # type: ignore
 
-        builder.add_edge(START, "perform_gui_action")
-        builder.add_edge("perform_gui_action", END)
-        # builder.add_edge("perform_gui_action", "check_gui_action")
-        # builder.add_conditional_edges(
-        #     "check_gui_action",
-        #     self.should_continue,  # type: ignore
-        # )
+        # Add the two nodes
+        builder.add_node(self.agent_node)  # type: ignore
+        builder.add_node(self.tool_node)  # type: ignore
+        builder.add_node(self.evaluate_node)  # type: ignore
+
+        # The graph starts by calling the agent
+        builder.add_edge(START, "agent_node")
+        builder.add_conditional_edges("agent_node", self.should_evaluate)  # type: ignore
+        builder.add_edge("evaluate_node", END)
 
         return builder.compile()  # type: ignore
 
@@ -169,7 +211,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         try:
             # Required to make the langchain tracing work
             handler = self.tracer.get_langchain_handler()
-            result = agent.ainvoke(  # type: ignore
+            result = await agent.ainvoke(  # type: ignore
                 {"task": task["task"]},  # type: ignore
                 {"callbacks": [handler] if handler else [], "recursion_limit": 100},
             )
@@ -180,6 +222,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         # TODO: Adjust
         reward = random.uniform(0, 1)
         return reward
+
 
 def debug_multimodal_agent():
     load_dotenv()
@@ -192,7 +235,7 @@ def debug_multimodal_agent():
         n_workers=1,
         initial_resources={
             "main_llm": LLM(
-                model=os.environ.get("MODEL", "Qwen/Qwen2.5-VL-32B-Instruct"),
+                model=os.environ.get("MODEL", "deepseek-ai/DeepSeek-V2.5"),
                 endpoint=os.environ["OPENAI_API_BASE"],
                 sampling_parameters={
                     "temperature": 0.7,
@@ -200,6 +243,7 @@ def debug_multimodal_agent():
             ),
         },
     ).dev(LitMultimodalAgent(debug=True), df)
+
 
 if __name__ == "__main__":
     debug_multimodal_agent()
