@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import uuid
 import os
 import random
@@ -12,7 +14,7 @@ import pandas as pd
 
 from langchain.chat_models import init_chat_model
 from langgraph.graph import START, END, MessagesState, StateGraph
-from langchain_core.messages import AIMessage, ToolMessage, ToolCall
+from langchain_core.messages import AIMessage, ToolMessage, ToolCall, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
 from langchain_mcp_adapters.client import MultiServerMCPClient, BaseTool, ClientSession
@@ -32,7 +34,6 @@ Demos: https://docs.langchain.com/oss/python/langgraph/workflows-agents
 - Additional states for planning
 - 
 Urgent TODO:
-- Multi session support
 - Debug mode
 - Image attachment
 
@@ -64,7 +65,20 @@ class State(MessagesState):
     num_turns: int
 
 
-# TODO: Every agent instance should have their own session id and use it to call the model
+def CallToolResult_to_ToolMessage(response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
+    text_blocks = []
+    if response.content:
+        for mcp_block in response.content:
+            if isinstance(mcp_block, dict):
+                if mcp_block.get("type") == "text":  # type: ignore
+                    text_blocks.append(mcp_block.get("text", "")) # type: ignore
+            else:
+                if hasattr(mcp_block, "type") and mcp_block.type == "text":
+                    text_blocks.append(getattr(mcp_block, "text", "")) # type: ignore
+
+    content_str = json.dumps(text_blocks)
+    return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
+
 class MultiModalAgent:
     def __init__(
         self,
@@ -78,11 +92,11 @@ class MultiModalAgent:
     ):
         self.debug = debug
         self.max_turns = max_turns
-        self.model_name: str = os.environ.get("MODEL", "deepseek-ai/DeepSeek-V2.5")
+        self.model_name: str = os.environ.get("MODEL", "Qwen/Qwen3-VL-32B-Instruct")
         self.session = session
         self.session_id = session_id
         self.client = client
-        self.llm = init_chat_model(
+        self.llm = init_chat_model(  # type: ignore
             self.model_name,
             model_provider="openai",
             openai_api_base=endpoint or os.environ["OPENAI_API_BASE"],
@@ -91,7 +105,9 @@ class MultiModalAgent:
             max_retries=1,
             max_tokens=2048,
         ).bind_tools(
-            tools=tools, tool_choice="any"
+        # Setting tool_coice="any" forces VLM to execute tool call. However it is not supported yet for all models
+        # tools=tools, tool_choice="any"
+        tools=tools
         )  # type: ignore
 
     async def agent_node(self, state: State) -> dict["str", Any]:
@@ -102,10 +118,8 @@ class MultiModalAgent:
                     "messages": state.get("messages", []),  # type: ignore
                 }
             )
-
             result = await self.llm.ainvoke(prompt)  # type: ignore
 
-            logger.info(result)
             return {"messages": [result]}
 
         except Exception as e:
@@ -114,34 +128,46 @@ class MultiModalAgent:
             raise
 
     async def invoke_tool(self, tool_call: ToolCall) -> ToolMessage:
-        def CallToolResult_to_ToolMessage(response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
-
-            langchain_blocks = []
-            if response.content:
-                for mcp_block in response.content:
-                    if isinstance(mcp_block, dict):
-                        if mcp_block.get("type") == "text":  # type: ignore
-                            langchain_blocks.append(  # type: ignore
-                                {"type": "text", "text": mcp_block.get("text", "")}  # type: ignore
-                            )
-                        # TODO: Add conversion for image
-                    else:
-                        # Handle if mcp_block is a Pydantic model or other object
-                        if hasattr(mcp_block, "type") and mcp_block.type == "text":
-                            langchain_blocks.append(  # type: ignore
-                                {"type": "text", "text": getattr(mcp_block, "text", "")}
-                            )
-
-            return ToolMessage(content_blocks=langchain_blocks, tool_call_id=original_tool_call_id)  # type: ignore
-
-        response: CallToolResult = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
-
+        response = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
         tool_call_id: str = tool_call["id"] if tool_call["id"] else ""
+
         return CallToolResult_to_ToolMessage(response, tool_call_id)
 
-    async def invoke_screenshot(self) -> None:
-        # TODO: implement screenshot capture and return/handle result
-        pass
+    async def screenshot_node(self, state: State) -> dict["str", Any]:
+            response = await self.session.call_tool(
+                name="desktop_screenshot",
+                arguments={},
+            )
+
+            base64_data = ""
+            media_type = "image/jpeg"
+            if response.content:
+                for mcp_block in response.content:
+                    if isinstance(mcp_block, dict) and mcp_block.get("type") == "image": # type: ignore
+                        base64_data = mcp_block.get("data", "") # type: ignore
+                    elif getattr(mcp_block, "type", None) == "image":
+                        base64_data = getattr(mcp_block, "data", "") 
+
+            if not base64_data:
+                logger.warning("No image data found in screenshot response")
+                return {"messages": []}
+
+            image_message = HumanMessage(
+                content=[
+                    {
+                        "type": "text", 
+                        "text": "Here is the current state of the desktop encoded using base64."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{base64_data}"
+                        },
+                    },
+                ]
+            )
+
+            return {"messages": [image_message]}
 
     async def tool_node(self, state: State) -> dict["str", Any]:
         last_message = cast(AIMessage, state["messages"][-1])  # type: ignore
@@ -151,19 +177,16 @@ class MultiModalAgent:
             messages.append(response)  # type: ignore
         return {"messages": messages}
 
-    async def evaluate_node(self, state: State) -> dict["str", Any]:
-        return {}
-
-    def should_evaluate(self, state: MessagesState) -> Literal["tool_node", "evaluate_node"]:
+    def should_continue(self, state: MessagesState) -> Literal[END, "tool_node"]:  # type: ignore
         """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
 
         messages = state["messages"]
         last_message = messages[-1]
 
-        if last_message.tool_calls:  # type: ignore
-            return "tool_node"
+        if not last_message.tool_calls:  # type: ignore
+            return END
 
-        return "evaluate_node"
+        return "tool_node"
 
     def graph(self) -> CompiledStateGraph[State]:
         builder = StateGraph(State)
@@ -171,12 +194,13 @@ class MultiModalAgent:
         # Add the two nodes
         builder.add_node(self.agent_node)  # type: ignore
         builder.add_node(self.tool_node)  # type: ignore
-        builder.add_node(self.evaluate_node)  # type: ignore
+        builder.add_node(self.screenshot_node)  # type: ignore
 
         # The graph starts by calling the agent
         builder.add_edge(START, "agent_node")
-        builder.add_conditional_edges("agent_node", self.should_evaluate)  # type: ignore
-        builder.add_edge("evaluate_node", END)
+        builder.add_edge("screenshot_node", "agent_node")
+        builder.add_edge("tool_node", "screenshot_node")
+        builder.add_conditional_edges("agent_node", self.should_continue)  # type: ignore
 
         return builder.compile()  # type: ignore
 
@@ -202,7 +226,6 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 "desktop_mouse_move",
                 "desktop_mouse_scroll",
                 "desktop_mouse_drag",
-                "desktop_screenshot",
                 "desktop_switch_window",
                 "desktop_get_windows",
                 "desktop_keyboard_type",
@@ -227,9 +250,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 SERVER_NAME: {
                     "transport": "streamable_http",
                     "url": "http://localhost:8888/mcp",
-                    "headers": {
-                        "x-session-id": session_id
-                    },
+                    "headers": {"x-session-id": session_id},
                 }
             }
         )
@@ -244,7 +265,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 tools=tools,
                 session=session,
                 session_id=session_id,
-                client=client
+                client=client,
             ).graph()
 
             try:
@@ -264,16 +285,20 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
 
 def debug_multimodal_agent():
     load_dotenv()
-    # TODO: Fix path
+
     gui_agent_dataset_data_path = os.path.join("examples", "multimodal", "data_generation", "gui_agent_dataset.parquet")
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    gui_agent_dataset_data_path = (
+        PROJECT_ROOT / "examples" / "multimodal" / "data_generation" / "gui_agent_dataset.parquet"
+    )
     df = pd.read_parquet(gui_agent_dataset_data_path).head(1)  # type: ignore
     df = cast(list[Dict[str, Any]], df.to_dict(orient="records"))  # type: ignore
 
     Trainer(
-        n_workers=3,
+        n_workers=1,
         initial_resources={
             "main_llm": LLM(
-                model=os.environ.get("MODEL", "deepseek-ai/DeepSeek-V2.5"),
+                model=os.environ.get("MODEL", "Qwen/Qwen3-VL-32B-Instruct"),
                 endpoint=os.environ["OPENAI_API_BASE"],
                 sampling_parameters={
                     "temperature": 0.7,
