@@ -50,19 +50,55 @@ AGENT_PROMPT = ChatPromptTemplate(
     [
         (
             "system",
-            "You are an autonomous sandbox agent that completes tasks by issuing MCP protocol actions. You will try to solve the task in the sandbox by evaluating",
+            "You are an autonomous sandbox agent that completes tasks by issuing MCP protocol actions. Select a tool to perform an action. If you believe there is nothing left to do, do not respond with any tool call.",
         ),
         ("user", "Task: {task}"),
         ("placeholder", "{messages}"),
     ]
 )
 
+EVALUATION_PROMPT = ChatPromptTemplate(
+    [
+        (
+            "system",
+            """You are an expert evaluator for a GUI agent. 
+Your goal is to determine if the agent's final screenshot matches the expected outcome of the task.
+Respond *only* with a JSON object in the following format:
+{{
+    "reasoning": "A brief explanation of your decision, comparing the screenshot to the expected outcome.",
+    "score": <1 if the task was completed successfully otherwise a 0>
+}}""",
+        ),
+        (
+            "user",
+            [
+                {
+                    "type": "text",
+                    "text": """
+Please evaluate the following:
+
+**Original Task:**
+{task}
+
+**Expected Outcome (Ground Truth):**
+{answer}
+
+**Final Screenshot:**
+""",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "{image_url}"},
+                },
+            ],
+        ),
+    ]
+)
+
 
 class State(MessagesState):
     task: str
-    execution: str  # Contains the image of the last evaluation of the last evaluation
-    feedback: str  # Feedback from evaluation
-    num_turns: int
+    execution: str
 
 
 def CallToolResult_to_ToolMessage(response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
@@ -71,13 +107,14 @@ def CallToolResult_to_ToolMessage(response: CallToolResult, original_tool_call_i
         for mcp_block in response.content:
             if isinstance(mcp_block, dict):
                 if mcp_block.get("type") == "text":  # type: ignore
-                    text_blocks.append(mcp_block.get("text", "")) # type: ignore
+                    text_blocks.append(mcp_block.get("text", ""))  # type: ignore
             else:
                 if hasattr(mcp_block, "type") and mcp_block.type == "text":
-                    text_blocks.append(getattr(mcp_block, "text", "")) # type: ignore
+                    text_blocks.append(getattr(mcp_block, "text", ""))  # type: ignore
 
     content_str = json.dumps(text_blocks)
     return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
+
 
 class MultiModalAgent:
     def __init__(
@@ -91,8 +128,8 @@ class MultiModalAgent:
         endpoint: str | None = None,
     ):
         self.debug = debug
-        self.max_turns = max_turns
-        self.model_name: str = os.environ.get("MODEL", "Qwen/Qwen3-VL-32B-Instruct")
+        self.turns = max_turns
+        self.model_name: str = os.environ.get("MODEL", "gpt-5-mini")
         self.session = session
         self.session_id = session_id
         self.client = client
@@ -105,9 +142,8 @@ class MultiModalAgent:
             max_retries=1,
             max_tokens=2048,
         ).bind_tools(
-        # Setting tool_coice="any" forces VLM to execute tool call. However it is not supported yet for all models
-        # tools=tools, tool_choice="any"
-        tools=tools
+            tools=tools,
+            tool_choice="any",
         )  # type: ignore
 
     async def agent_node(self, state: State) -> dict["str", Any]:
@@ -119,7 +155,6 @@ class MultiModalAgent:
                 }
             )
             result = await self.llm.ainvoke(prompt)  # type: ignore
-
             return {"messages": [result]}
 
         except Exception as e:
@@ -134,40 +169,36 @@ class MultiModalAgent:
         return CallToolResult_to_ToolMessage(response, tool_call_id)
 
     async def screenshot_node(self, state: State) -> dict["str", Any]:
-            response = await self.session.call_tool(
-                name="desktop_screenshot",
-                arguments={},
-            )
+        response = await self.session.call_tool(
+            name="desktop_screenshot",
+            arguments={},
+        )
 
-            base64_data = ""
-            media_type = "image/jpeg"
-            if response.content:
-                for mcp_block in response.content:
-                    if isinstance(mcp_block, dict) and mcp_block.get("type") == "image": # type: ignore
-                        base64_data = mcp_block.get("data", "") # type: ignore
-                    elif getattr(mcp_block, "type", None) == "image":
-                        base64_data = getattr(mcp_block, "data", "") 
+        base64_data = ""
+        media_type = "image/jpeg"
+        if response.content:
+            for mcp_block in response.content:
+                if isinstance(mcp_block, dict) and mcp_block.get("type") == "image":  # type: ignore
+                    base64_data = mcp_block.get("data", "")  # type: ignore
+                elif getattr(mcp_block, "type", None) == "image":
+                    base64_data = getattr(mcp_block, "data", "")
 
-            if not base64_data:
-                logger.warning("No image data found in screenshot response")
-                return {"messages": []}
+        if not base64_data:
+            logger.warning("No image data found in screenshot response")
+            return {"messages": []}
 
-            image_message = HumanMessage(
-                content=[
-                    {
-                        "type": "text", 
-                        "text": "Here is the current state of the desktop encoded using base64."
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{media_type};base64,{base64_data}"
-                        },
-                    },
-                ]
-            )
+        image_url = f"data:{media_type};base64,{base64_data}"
+        image_message = HumanMessage(
+            content=[
+                {"type": "text", "text": "Here is the current state of the desktop encoded using base64."},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image_url},
+                },
+            ]
+        )
 
-            return {"messages": [image_message]}
+        return {"messages": [image_message], "execution": image_url}
 
     async def tool_node(self, state: State) -> dict["str", Any]:
         last_message = cast(AIMessage, state["messages"][-1])  # type: ignore
@@ -177,13 +208,13 @@ class MultiModalAgent:
             messages.append(response)  # type: ignore
         return {"messages": messages}
 
-    def should_continue(self, state: MessagesState) -> Literal[END, "tool_node"]:  # type: ignore
-        """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
+    def should_continue(self, state: State) -> Literal[END, "tool_node"]:  # type: ignore
+        self.turns -= 1
 
         messages = state["messages"]
         last_message = messages[-1]
 
-        if not last_message.tool_calls:  # type: ignore
+        if self.turns == 0 or not last_message.tool_calls:  # type: ignore
             return END
 
         return "tool_node"
@@ -191,12 +222,10 @@ class MultiModalAgent:
     def graph(self) -> CompiledStateGraph[State]:
         builder = StateGraph(State)
 
-        # Add the two nodes
         builder.add_node(self.agent_node)  # type: ignore
         builder.add_node(self.tool_node)  # type: ignore
         builder.add_node(self.screenshot_node)  # type: ignore
 
-        # The graph starts by calling the agent
         builder.add_edge(START, "agent_node")
         builder.add_edge("screenshot_node", "agent_node")
         builder.add_edge("tool_node", "screenshot_node")
@@ -278,10 +307,70 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             except Exception as e:
                 logger.exception(f"[Rollout {rollout_id}] Error during agent invocation: {e}")
                 return
+        if "result" not in locals():
+            logger.error(f"[Rollout {rollout_id}] Agent invocation failed, returning 0.0 reward.")
+            return 0.0
 
-        reward = random.uniform(0, 1)
+        reward = await self._evaluate_with_llm(result, task, llm)
+        logger.info(f"[Rollout {rollout_id}] Final LLM-evaluated reward: {reward}")
         return reward
 
+    async def _evaluate_with_llm(
+            self,
+            final_state: Dict[str, Any],
+            task: Dict[str, Any],
+            llm_resource: LLM,
+        ) -> float:
+            """
+            Uses a VLM to evaluate the task completion by comparing the final
+            screenshot to the ground truth answer.
+            """
+
+            task_description = final_state.get("task")
+            expected_answer = task.get("answer") 
+            image_url = final_state.get("execution")
+
+            if not image_url or not task_description or not expected_answer:
+                logger.error("Evaluation failed: Missing task, answer, or final image.")
+                return 0.0
+
+            evaluator_llm = init_chat_model(
+                model=os.environ.get("EVALUATOR_MODEL", "gpt-4o"),
+                model_provider="openai",
+                openai_api_base=llm_resource.endpoint,
+                openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
+                temperature=0,
+                max_tokens=512,
+            )
+
+            prompt = EVALUATION_PROMPT.invoke(
+                {
+                    "task": task_description,
+                    "answer": expected_answer,
+                    "image_url": image_url,
+                }
+            )
+
+            response_content = ""
+            try:
+                response = await evaluator_llm.ainvoke(prompt)
+                response_content = str(response.content) # type: ignore
+
+                if "```json" in response_content:
+                    response_content = response_content.split("```json")[1].split("```")[0].strip()
+
+                eval_result = json.loads(response_content)
+
+                score = float(eval_result.get("score", 0.0))
+                logger.info(f"Evaluation reasoning: {eval_result.get('reasoning', 'N/A')}")
+                return score
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Evaluation failed: Could not decode JSON from LLM. Response: {response_content}. Error: {e}")
+                return 0.0
+            except Exception as e:
+                logger.error(f"Evaluation failed with an unexpected error: {e}. Response: {response_content}")
+                return 0.0
 
 def debug_multimodal_agent():
     load_dotenv()
@@ -298,14 +387,14 @@ def debug_multimodal_agent():
         n_workers=1,
         initial_resources={
             "main_llm": LLM(
-                model=os.environ.get("MODEL", "Qwen/Qwen3-VL-32B-Instruct"),
+                model=os.environ.get("MODEL", "gpt-5-mini"),
                 endpoint=os.environ["OPENAI_API_BASE"],
                 sampling_parameters={
                     "temperature": 0.7,
                 },
             ),
         },
-    ).dev(LitMultimodalAgent(debug=True), df)
+    ).dev(LitMultimodalAgent(debug=True, max_turns=5), df)
 
 
 if __name__ == "__main__":
