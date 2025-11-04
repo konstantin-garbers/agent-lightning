@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import uuid
 import os
-import random
 from typing import Any, Dict, Optional, cast, Literal
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -27,30 +26,24 @@ from dotenv import load_dotenv
 
 logger = configure_logger()
 
-"""
-Demos: https://docs.langchain.com/oss/python/langgraph/workflows-agents
-
-- Better error handling
-- Additional states for planning
-- 
-Urgent TODO:
-- Debug mode
-- Image attachment
-
-Future TODO:
-- Better error handling
-- Additional states for planning
-- Initial state to capture the initial GUI state
-"""
-
 SERVER_NAME = "edgebox-sandbox"
 
-# TODO: Append Tool Message Calls, e.g. what was returned after each tool use
 AGENT_PROMPT = ChatPromptTemplate(
     [
         (
             "system",
-            "You are an autonomous sandbox agent that completes tasks by issuing MCP protocol actions. Select a tool to perform an action. If you believe there is nothing left to do, do not respond with any tool call.",
+            """You are an autonomous GUI agent. Your sole purpose is to complete the user's task by issuing MCP protocol actions.
+
+You will operate in a loop:
+1.  **Observe:** You will be given the current state of the desktop as a screenshot (in a HumanMessage).
+2.  **Think:** Analyze this screenshot, the original task (from the user), and the results of your previous actions (from ToolMessages). Formulate a step-by-step plan.
+3.  **Act:** Based on your plan, select **one single tool** to execute.
+4.  **Repeat:** You will get a new screenshot and the result of your action, and the loop will continue.
+
+**Important Rules:**
+* Pay close attention to the `ToolMessage` results. They tell you if your last action was successful or if an error occurred.
+* Base every action on the **most recent screenshot**.
+* When you believe the task is fully complete, respond with only text (no tool call) to finish the mission.""",
         ),
         ("user", "Task: {task}"),
         ("placeholder", "{messages}"),
@@ -99,21 +92,8 @@ Please evaluate the following:
 class State(MessagesState):
     task: str
     execution: str
-
-
-def CallToolResult_to_ToolMessage(response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
-    text_blocks = []
-    if response.content:
-        for mcp_block in response.content:
-            if isinstance(mcp_block, dict):
-                if mcp_block.get("type") == "text":  # type: ignore
-                    text_blocks.append(mcp_block.get("text", ""))  # type: ignore
-            else:
-                if hasattr(mcp_block, "type") and mcp_block.type == "text":
-                    text_blocks.append(getattr(mcp_block, "text", ""))  # type: ignore
-
-    content_str = json.dumps(text_blocks)
-    return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
+    num_turns: int
+    agent_error: str
 
 
 class MultiModalAgent:
@@ -128,7 +108,7 @@ class MultiModalAgent:
         endpoint: str | None = None,
     ):
         self.debug = debug
-        self.turns = max_turns
+        self.max_turns = max_turns
         self.model_name: str = os.environ.get("MODEL", "gpt-5-mini")
         self.session = session
         self.session_id = session_id
@@ -136,7 +116,7 @@ class MultiModalAgent:
         self.llm = init_chat_model(  # type: ignore
             self.model_name,
             model_provider="openai",
-            openai_api_base=endpoint or os.environ["OPENAI_API_BASE"],
+            openai_api_base=endpoint or os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
             openai_api_key=os.environ["OPENAI_API_KEY"],
             temperature=0,
             max_retries=1,
@@ -146,7 +126,35 @@ class MultiModalAgent:
             tool_choice="any",
         )  # type: ignore
 
+    def _parse_mcp_content(self, response: CallToolResult, content_type: str = "text") -> list[str]:
+        data_blocks = []
+        if not response.content:
+            return data_blocks  # type: ignore
+
+        for mcp_block in response.content:
+            data_key = "text" if content_type == "text" else "data"
+
+            if isinstance(mcp_block, dict):
+                if mcp_block.get("type") == content_type:  # type: ignore
+                    data_blocks.append(mcp_block.get(data_key, ""))  # type: ignore
+            elif getattr(mcp_block, "type", None) == content_type:
+                data_blocks.append(getattr(mcp_block, data_key, ""))  # type: ignore
+
+        return data_blocks  # type: ignore
+
+    def _CallToolResult_to_ToolMessage(self, response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
+        text_blocks = self._parse_mcp_content(response, content_type="text")
+
+        if text_blocks:
+            content_str = json.dumps(text_blocks)
+        else:
+            content_str = "No text output from tool."
+
+        return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
+
     async def agent_node(self, state: State) -> dict["str", Any]:
+        current_turns = state.get("num_turns", 0) + 1
+
         try:
             prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
                 {
@@ -155,33 +163,42 @@ class MultiModalAgent:
                 }
             )
             result = await self.llm.ainvoke(prompt)  # type: ignore
-            return {"messages": [result]}
+            return {"messages": [result], "num_turns": current_turns, "agent_error": None}
 
         except Exception as e:
             err_msg = f"Agent node failed {e}"
-            logger.exception(err_msg)
-            raise
+            return {"agent_error": err_msg, "num_turns": current_turns}
 
     async def invoke_tool(self, tool_call: ToolCall) -> ToolMessage:
-        response = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
-        tool_call_id: str = tool_call["id"] if tool_call["id"] else ""
+        tool_call_id: str = tool_call.get("id") or ""
 
-        return CallToolResult_to_ToolMessage(response, tool_call_id)
+        try:
+            response = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
+
+            # Just call the new helper method
+            return self._CallToolResult_to_ToolMessage(response, tool_call_id)
+
+        except Exception as e:
+            err_msg = f"Tool call {tool_call['name']} failed: {e}"
+            logger.error(err_msg)
+            # Return an error as a ToolMessage
+            return ToolMessage(content=err_msg, tool_call_id=tool_call_id)
 
     async def screenshot_node(self, state: State) -> dict["str", Any]:
-        response = await self.session.call_tool(
-            name="desktop_screenshot",
-            arguments={},
-        )
+        try:
+            response = await self.session.call_tool(
+                name="desktop_screenshot",
+                arguments={},
+            )
+        except Exception as e:
+            logger.error(f"Screenshot failed: {e}")
+            # Return an error message for the agent
+            error_msg = HumanMessage(content=f"Error taking screenshot: {e}")
+            return {"messages": [error_msg]}
 
-        base64_data = ""
         media_type = "image/jpeg"
-        if response.content:
-            for mcp_block in response.content:
-                if isinstance(mcp_block, dict) and mcp_block.get("type") == "image":  # type: ignore
-                    base64_data = mcp_block.get("data", "")  # type: ignore
-                elif getattr(mcp_block, "type", None) == "image":
-                    base64_data = getattr(mcp_block, "data", "")
+        image_data_list = self._parse_mcp_content(response, content_type="image")
+        base64_data = image_data_list[0] if image_data_list else ""
 
         if not base64_data:
             logger.warning("No image data found in screenshot response")
@@ -203,18 +220,22 @@ class MultiModalAgent:
     async def tool_node(self, state: State) -> dict["str", Any]:
         last_message = cast(AIMessage, state["messages"][-1])  # type: ignore
         messages = []
-        for tool_call in last_message.tool_calls:  # type: ignore
-            response = await self.invoke_tool(tool_call)  # type: ignore
-            messages.append(response)  # type: ignore
+        for tool_call in last_message.tool_calls:
+            try:
+                response = await self.invoke_tool(tool_call)
+                messages.append(response)  # type: ignore
+            except Exception as e:
+                err_msg = f"Tool call {tool_call['name']} failed: {e}"
+                logger.error(err_msg)
+                # We do not terminate if we encounter an error during a tool call
+                messages.append(ToolMessage(content=err_msg, tool_call_id=tool_call.get("id", "")))  # type: ignore
         return {"messages": messages}
 
     def should_continue(self, state: State) -> Literal[END, "tool_node"]:  # type: ignore
-        self.turns -= 1
-
         messages = state["messages"]
         last_message = messages[-1]
 
-        if self.turns == 0 or not last_message.tool_calls:  # type: ignore
+        if state["agent_error"] or self.max_turns == state["num_turns"] or not last_message.tool_calls:  # type: ignore
             return END
 
         return "tool_node"
@@ -246,7 +267,6 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.max_turns = max_turns
         self.debug = debug
 
-    # TODO: We need "main_llm" in resources
     async def rollout_async(self, task, resources, rollout) -> float | None:
         def _filter_tools(tools: list[BaseTool]) -> list[BaseTool]:
             ACCEPTED_TOOL_NAME_LIST = [
@@ -272,25 +292,27 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             logger.info(f"[Rollout {rollout.rollout_id}] Starting rollout for task: {task}")
 
         rollout_id = rollout.rollout_id
-        llm: LLM = cast(LLM, resources["main_llm"])
+        agent_llm: LLM = cast(LLM, resources["agent_llm"])
         session_id = str(uuid.uuid4())
+        server_name = SERVER_NAME + "-" + session_id
         client = MultiServerMCPClient(
             {
-                SERVER_NAME: {
+                server_name: {
                     "transport": "streamable_http",
                     "url": "http://localhost:8888/mcp",
                     "headers": {"x-session-id": session_id},
                 }
             }
         )
+
         tools: list[BaseTool] = await client.get_tools()
         tools = _filter_tools(tools)
 
-        async with client.session(SERVER_NAME) as session:
+        async with client.session(server_name) as session:
             agent = MultiModalAgent(
                 max_turns=self.max_turns,
                 debug=self.debug,
-                endpoint=llm.get_base_url(rollout.rollout_id, rollout.attempt.attempt_id),  # type: ignore
+                endpoint=agent_llm.get_base_url(rollout.rollout_id, rollout.attempt.attempt_id),  # type: ignore
                 tools=tools,
                 session=session,
                 session_id=session_id,
@@ -307,70 +329,74 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             except Exception as e:
                 logger.exception(f"[Rollout {rollout_id}] Error during agent invocation: {e}")
                 return
+
         if "result" not in locals():
             logger.error(f"[Rollout {rollout_id}] Agent invocation failed, returning 0.0 reward.")
             return 0.0
 
-        reward = await self._evaluate_with_llm(result, task, llm)
+
+        evaluation_llm: LLM = cast(LLM, resources["agent_llm"])
+        reward = await self._evaluate_with_llm(result, task, evaluation_llm)
         logger.info(f"[Rollout {rollout_id}] Final LLM-evaluated reward: {reward}")
         return reward
 
     async def _evaluate_with_llm(
-            self,
-            final_state: Dict[str, Any],
-            task: Dict[str, Any],
-            llm_resource: LLM,
-        ) -> float:
-            """
-            Uses a VLM to evaluate the task completion by comparing the final
-            screenshot to the ground truth answer.
-            """
+        self,
+        final_state: Dict[str, Any],
+        task: Dict[str, Any],
+        evaluation_llm: LLM,
+    ) -> float:
 
-            task_description = final_state.get("task")
-            expected_answer = task.get("answer") 
-            image_url = final_state.get("execution")
 
-            if not image_url or not task_description or not expected_answer:
-                logger.error("Evaluation failed: Missing task, answer, or final image.")
-                return 0.0
+        task_description = final_state.get("task")
+        expected_answer = task.get("answer")
+        image_url = final_state.get("execution")
 
-            evaluator_llm = init_chat_model(
-                model=os.environ.get("EVALUATOR_MODEL", "gpt-4o"),
-                model_provider="openai",
-                openai_api_base=llm_resource.endpoint,
-                openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
-                temperature=0,
-                max_tokens=512,
-            )
+        if not image_url or not task_description or not expected_answer:
+            logger.error("Evaluation failed: Missing task, answer, or final image.")
+            return 0.0
 
-            prompt = EVALUATION_PROMPT.invoke(
-                {
-                    "task": task_description,
-                    "answer": expected_answer,
-                    "image_url": image_url,
-                }
-            )
+        if final_state.get("agent_error"):
+            logger.error(final_state.get("agent_error"))
+            return 0.0
 
-            response_content = ""
-            try:
-                response = await evaluator_llm.ainvoke(prompt)
-                response_content = str(response.content) # type: ignore
+        prompt = EVALUATION_PROMPT.invoke(
+            {
+                "task": task_description,
+                "answer": expected_answer,
+                "image_url": image_url,
+            }
+        )
 
-                if "```json" in response_content:
-                    response_content = response_content.split("```json")[1].split("```")[0].strip()
+        response_content = ""
+        try:
+            model = init_chat_model(
+                    model=evaluation_llm.model,
+                    model_provider="openai",
+                    openai_api_base=evaluation_llm.endpoint,  # Use the endpoint from the resource
+                    openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
+                    temperature=0,
+                    max_tokens=512,
+                )
+            response = await model.ainvoke(prompt)  # type: ignore
+            response_content = str(response.content)  # type: ignore
 
-                eval_result = json.loads(response_content)
+            if "```json" in response_content:
+                response_content = response_content.split("```json")[1].split("```")[0].strip()
 
-                score = float(eval_result.get("score", 0.0))
-                logger.info(f"Evaluation reasoning: {eval_result.get('reasoning', 'N/A')}")
-                return score
+            eval_result = json.loads(response_content)
 
-            except json.JSONDecodeError as e:
-                logger.error(f"Evaluation failed: Could not decode JSON from LLM. Response: {response_content}. Error: {e}")
-                return 0.0
-            except Exception as e:
-                logger.error(f"Evaluation failed with an unexpected error: {e}. Response: {response_content}")
-                return 0.0
+            score = float(eval_result.get("score", 0.0))
+            logger.info(f"Evaluation reasoning: {eval_result.get('reasoning', 'N/A')}")
+            return score
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Evaluation failed: Could not decode JSON from LLM. Response: {response_content}. Error: {e}")
+            return 0.0
+        except Exception as e:
+            logger.error(f"Evaluation failed with an unexpected error: {e}. Response: {response_content}")
+            return 0.0
+
 
 def debug_multimodal_agent():
     load_dotenv()
@@ -383,18 +409,26 @@ def debug_multimodal_agent():
     df = pd.read_parquet(gui_agent_dataset_data_path).head(1)  # type: ignore
     df = cast(list[Dict[str, Any]], df.to_dict(orient="records"))  # type: ignore
 
-    Trainer(
-        n_workers=1,
-        initial_resources={
-            "main_llm": LLM(
-                model=os.environ.get("MODEL", "gpt-5-mini"),
-                endpoint=os.environ["OPENAI_API_BASE"],
-                sampling_parameters={
-                    "temperature": 0.7,
-                },
-            ),
+    agent_llm = LLM(
+        model=os.environ.get("AGENT_MODEL", "gpt-5-mini"),
+        endpoint=os.environ["OPENAI_API_BASE"],
+        sampling_parameters={
+            "temperature": 0.7,
         },
-    ).dev(LitMultimodalAgent(debug=True, max_turns=5), df)
+    )
+
+    evaluation_llm = LLM(
+        model=os.environ.get("EVALUATION_MODEL", "gpt-5-mini"),
+        endpoint=os.environ["OPENAI_API_BASE"],
+        sampling_parameters={
+            "temperature": 0.7,
+        },
+    )
+
+    Trainer(
+        n_workers=3,
+        initial_resources={"agent_llm": agent_llm, "evaluation_llm": evaluation_llm},
+    ).dev(LitMultimodalAgent(debug=True, max_turns=3), df)
 
 
 if __name__ == "__main__":
