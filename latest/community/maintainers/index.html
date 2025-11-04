@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://microsoft.github.io/agent-lightning/latest/tutorials/installation/">
+        <link rel="canonical" href="https://microsoft.github.io/agent-lightning/latest/community/maintainers/">
       
       
-        <link rel="prev" href="../..">
+        <link rel="prev" href="../contributing/">
       
       
-        <link rel="next" href="../../how-to/train-first-agent/">
+        <link rel="next" href="../../changelog/">
       
       
       <link rel="icon" href="../../assets/favicon.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Installation - Agent-lightning</title>
+        <title>Maintainer Guide - Agent-lightning</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation-guide" class="md-skip">
+        <a href="#maintainer-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -121,7 +121,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Maintainer Guide
             
           </span>
         </div>
@@ -287,8 +287,6 @@
       
   
   
-    
-  
   
   
     
@@ -301,11 +299,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -321,7 +321,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Quickstart
@@ -332,32 +332,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Installation
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../tutorials/installation/" class="md-nav__link">
         
   
   
@@ -368,161 +346,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#installing-from-pypi" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing from PyPI
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installing from PyPI">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#install-the-stable-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Install the Stable Release
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-the-nightly-build-latest-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      Install the Nightly Build (Latest Features)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#algorithm-specific-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Algorithm-specific Installation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Algorithm-specific Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#installing-apo" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing APO
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installing-verl" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing VERL
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-specific-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example-specific Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installing-from-source-for-developers-and-contributors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing from Source (for Developers and Contributors)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installing from Source (for Developers and Contributors)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-install-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Why Install from Source?
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-uv-for-dependency-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      Using uv for Dependency Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#minimal-developer-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Minimal Developer Installation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installing-all-extras-cpu-or-gpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing All Extras (CPU or GPU)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#activating-your-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      Activating Your Environment
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -731,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../write-agents/" class="md-nav__link">
+      <a href="../../tutorials/write-agents/" class="md-nav__link">
         
   
   
@@ -754,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../debug/" class="md-nav__link">
+      <a href="../../tutorials/debug/" class="md-nav__link">
         
   
   
@@ -777,7 +600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../traces/" class="md-nav__link">
+      <a href="../../tutorials/traces/" class="md-nav__link">
         
   
   
@@ -800,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../parallelize/" class="md-nav__link">
+      <a href="../../tutorials/parallelize/" class="md-nav__link">
         
   
   
@@ -1351,8 +1174,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1363,13 +1188,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
@@ -1385,7 +1208,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Miscellaneous
@@ -1399,7 +1222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/contributing/" class="md-nav__link">
+      <a href="../contributing/" class="md-nav__link">
         
   
   
@@ -1419,10 +1242,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../community/maintainers/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Maintainer Guide
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1433,6 +1278,77 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#release-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Release Workflow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#immediately-after-shipping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Immediately After Shipping
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preparing-the-next-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Preparing the Next Release
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#working-with-ci-labels-and-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      Working with CI Labels and /ci
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backporting-pull-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Backporting Pull Requests
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1495,28 +1411,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installing-from-pypi" class="md-nav__link">
+  <a href="#release-workflow" class="md-nav__link">
     <span class="md-ellipsis">
-      Installing from PyPI
+      Release Workflow
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installing from PyPI">
+    <nav class="md-nav" aria-label="Release Workflow">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#install-the-stable-release" class="md-nav__link">
+  <a href="#immediately-after-shipping" class="md-nav__link">
     <span class="md-ellipsis">
-      Install the Stable Release
+      Immediately After Shipping
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#install-the-nightly-build-latest-features" class="md-nav__link">
+  <a href="#preparing-the-next-release" class="md-nav__link">
     <span class="md-ellipsis">
-      Install the Nightly Build (Latest Features)
+      Preparing the Next Release
     </span>
   </a>
   
@@ -1528,104 +1444,20 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#algorithm-specific-installation" class="md-nav__link">
+  <a href="#working-with-ci-labels-and-ci" class="md-nav__link">
     <span class="md-ellipsis">
-      Algorithm-specific Installation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Algorithm-specific Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#installing-apo" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing APO
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installing-verl" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing VERL
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-specific-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example-specific Installation
+      Working with CI Labels and /ci
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#installing-from-source-for-developers-and-contributors" class="md-nav__link">
+  <a href="#backporting-pull-requests" class="md-nav__link">
     <span class="md-ellipsis">
-      Installing from Source (for Developers and Contributors)
+      Backporting Pull Requests
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Installing from Source (for Developers and Contributors)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-install-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Why Install from Source?
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-uv-for-dependency-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      Using uv for Dependency Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#minimal-developer-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Minimal Developer Installation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installing-all-extras-cpu-or-gpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installing All Extras (CPU or GPU)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#activating-your-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      Activating Your Environment
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1687,7 +1519,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 22, 2025 02:03:43 UTC"><span class="timeago" datetime="2025-10-22T02:03:43+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 22, 2025 02:03:43 UTC">2025-10-22</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 1, 2025 05:08:59 UTC"><span class="timeago" datetime="2025-11-01T05:08:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 1, 2025 05:08:59 UTC">2025-11-01</span>
   </span>
 
     
@@ -1697,7 +1529,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 10, 2025 06:44:00 UTC"><span class="timeago" datetime="2025-08-10T06:44:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 10, 2025 06:44:00 UTC">2025-08-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 1, 2025 05:08:59 UTC"><span class="timeago" datetime="2025-11-01T05:08:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 1, 2025 05:08:59 UTC">2025-11-01</span>
   </span>
 
     
@@ -1722,133 +1554,85 @@
 
 
 <!-- Page content -->
-<h1 id="installation-guide">Installation Guide<a class="headerlink" href="#installation-guide" title="Permanent link">&para;</a></h1>
-<p>This guide explains how to install <strong>Agent-Lightning</strong>. You can install it from <strong>PyPI</strong> (the Python Package Index) for general use or directly from the <strong>source code</strong> if you plan to contribute or need fine-grained control over dependencies.</p>
-<div class="admonition info">
-<p class="admonition-title">Platform and Hardware Requirements</p>
-<p>Agent-Lightning is officially supported on <strong>Linux distributions</strong> (Ubuntu 22.04 or later is recommended).
-At the moment <strong>macOS and Windows</strong> (outside of WSL2) are not supported.</p>
-<p>The Python runtime must be <strong>Python 3.10 or newer</strong>. We recommend using the latest patch release of Python 3.10, 3.11, or 3.12 to pick up performance and security updates.</p>
-<p>A <strong>GPU is optional</strong>—you only need CUDA-capable hardware if you plan to fine-tune model weights or run GPU-accelerated workloads. CPU-only environments are fully supported for evaluation and inference.</p>
-</div>
-<h2 id="installing-from-pypi">Installing from PyPI<a class="headerlink" href="#installing-from-pypi" title="Permanent link">&para;</a></h2>
-<p>The easiest way to get started is by installing Agent-Lightning directly from PyPI. This ensures you get the latest <strong>stable release</strong> of the package, tested for compatibility and reliability.</p>
-<h3 id="install-the-stable-release">Install the Stable Release<a class="headerlink" href="#install-the-stable-release" title="Permanent link">&para;</a></h3>
-<p>Run the following command in your terminal:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>agentlightning
-</code></pre></div>
-<p>This installs or upgrades Agent-Lightning to the newest stable version.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>If you intend to use <strong>Agent-Lightning</strong> with <a href="../../algorithm-zoo/verl/"><strong>VERL</strong></a> or run any of its <strong>example scripts</strong>, you’ll need to install some additional dependencies.
-See the sections on <a href="#algorithm-specific-installation">Algorithm-specific installation</a> and <a href="#example-specific-installation">Example-specific installation</a> for details.</p>
-</div>
-<h3 id="install-the-nightly-build-latest-features">Install the Nightly Build (Latest Features)<a class="headerlink" href="#install-the-nightly-build-latest-features" title="Permanent link">&para;</a></h3>
-<p>Agent-Lightning also publishes <strong>nightly builds</strong>, which contain the latest experimental features and improvements from the main branch. These are available via <strong>Test PyPI</strong>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>--index-url<span class="w"> </span>https://test.pypi.org/simple/<span class="w"> </span>--extra-index-url<span class="w"> </span>https://pypi.org/simple/<span class="w"> </span>agentlightning
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The nightly builds are cutting-edge but may include unstable or untested changes.
-Use them <strong>at your own risk</strong>, especially in production environments.</p>
-</div>
-<h2 id="algorithm-specific-installation">Algorithm-specific Installation<a class="headerlink" href="#algorithm-specific-installation" title="Permanent link">&para;</a></h2>
-<p>Agent-Lightning supports multiple learning algorithms. Some of them like <a href="../../algorithm-zoo/apo/">APO</a> or <a href="../../algorithm-zoo/verl/">VERL</a> require extra dependencies. You can install them automatically using <strong>optional extras</strong> or manually if you prefer finer control.</p>
-<h3 id="installing-apo">Installing APO<a class="headerlink" href="#installing-apo" title="Permanent link">&para;</a></h3>
-<p><a href="../../algorithm-zoo/apo/">APO</a> is an algorithm module that depends on libraries such as <a href="https://github.com/microsoft/POML">POML</a>.
-You can install Agent-Lightning with APO support by running:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentlightning<span class="o">[</span>apo<span class="o">]</span>
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>APO also depends on the <a href="https://github.com/openai/openai-python">OpenAI Python SDK</a>, version <strong>2.0 or newer</strong>.
-Ensure your SDK version is up to date to avoid compatibility issues.</p>
-</div>
-<h3 id="installing-verl">Installing VERL<a class="headerlink" href="#installing-verl" title="Permanent link">&para;</a></h3>
-<p><a href="../../algorithm-zoo/verl/">VERL</a> integrates with libraries like <strong>PyTorch</strong>, <strong>vLLM</strong>, and <strong>VERL framework</strong>.
-Although you <em>can</em> install all dependencies automatically, we recommend doing it manually to avoid version conflicts.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentlightning<span class="o">[</span>verl<span class="o">]</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Recommended Manual Setup (More Stable)</p>
-<p>Automated installation may cause issues if you don’t have a compatible <strong>PyTorch</strong> or <strong>CUDA</strong> version preinstalled.
-For a more stable setup, install dependencies step-by-step:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.8.0<span class="w"> </span><span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.23.0<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu128
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>flash-attn<span class="w"> </span>--no-build-isolation
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">vllm</span><span class="o">==</span><span class="m">0</span>.10.2
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">verl</span><span class="o">==</span><span class="m">0</span>.5.0
-</code></pre></div>
-<p>This approach ensures compatibility with CUDA 12.8 and minimizes dependency conflicts.</p>
-</div>
-<h2 id="example-specific-installation">Example-specific Installation<a class="headerlink" href="#example-specific-installation" title="Permanent link">&para;</a></h2>
-<p>Each example in the <code>examples/</code> directory may have its own additional dependencies.
-Please refer to the <strong>README</strong> file of each example for detailed setup instructions:</p>
-<p><a href="https://github.com/microsoft/agent-lightning/tree/cab5c4c9201b1b9dafda31cb513f697a5a33a95d/examples">See Example READMEs</a>.</p>
-<h2 id="installing-from-source-for-developers-and-contributors">Installing from Source (for Developers and Contributors)<a class="headerlink" href="#installing-from-source-for-developers-and-contributors" title="Permanent link">&para;</a></h2>
-<p>If you plan to contribute to Agent-Lightning or prefer to work with the latest development code, install it directly from the <strong>source repository</strong>.</p>
-<h3 id="why-install-from-source">Why Install from Source?<a class="headerlink" href="#why-install-from-source" title="Permanent link">&para;</a></h3>
-<ul>
-<li>You want to <strong>modify or contribute</strong> to the project.</li>
-<li>You prefer an <strong>isolated development environment</strong>.</li>
-<li>You want to test unreleased features or fix bugs locally.</li>
+<h1 id="maintainer-guide">Maintainer Guide<a class="headerlink" href="#maintainer-guide" title="Permanent link">&para;</a></h1>
+<p>This guide describes the day-to-day responsibilities for Agent Lightning maintainers—how to bump versions, run release ceremonies, interact with CI, and backport fixes safely.</p>
+<h2 id="release-workflow">Release Workflow<a class="headerlink" href="#release-workflow" title="Permanent link">&para;</a></h2>
+<p>Follow this checklist throughout each release cycle.</p>
+<h3 id="immediately-after-shipping">Immediately After Shipping<a class="headerlink" href="#immediately-after-shipping" title="Permanent link">&para;</a></h3>
+<p>Agent Lightning uses a <strong>bump-first</strong> strategy. As soon as a release is published:</p>
+<ol>
+<li>Update version metadata:<ul>
+<li><code>pyproject.toml</code>: bump the <code>version</code>.</li>
+<li><code>agentlightning/__init__.py</code>: update <code>__version__</code> if it exists.</li>
+<li><code>uv.lock</code>: refresh the lock file after the bump.</li>
 </ul>
-<h3 id="using-uv-for-dependency-management">Using <code>uv</code> for Dependency Management<a class="headerlink" href="#using-uv-for-dependency-management" title="Permanent link">&para;</a></h3>
-<p>Starting with version <strong>0.2</strong>, Agent-Lightning uses <a href="https://docs.astral.sh/uv/"><code>uv</code></a> as its <strong>default dependency manager</strong>.</p>
-<p><code>uv</code> is a fast and safe alternative to <code>pip</code> that:</p>
-<ul>
-<li>Installs packages <strong>in seconds</strong> (instead of minutes),</li>
-<li>Prevents <strong>dependency conflicts</strong>,</li>
-<li>Supports <strong>grouped dependencies</strong> for optional features.</li>
+</li>
+<li>
+<p>Refresh dependency pins as needed:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>lock<span class="w"> </span>--upgrade
+</code></pre></div></p>
+</li>
+<li>
+<p>For a new minor or major release, create a stable branch from <code>main</code>:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>pull<span class="w"> </span>upstream<span class="w"> </span>main
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>stable/v2.0.x<span class="w">  </span><span class="c1"># adjust to the new series</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>stable/v2.0.x
+</code></pre></div></p>
+<p>All future changes to the stable branch must land via pull requests.</p>
+</li>
+</ol>
+<h3 id="preparing-the-next-release">Preparing the Next Release<a class="headerlink" href="#preparing-the-next-release" title="Permanent link">&para;</a></h3>
+<p>When it is time to publish the next version:</p>
+<ol>
+<li><strong>Draft release notes</strong> in <code>docs/changelog.md</code>, collecting every notable change since the previous tag.</li>
+<li><strong>Open a release PR</strong> targeting <code>main</code> (for minor/major) or the relevant stable branch (for patch releases). Use the title <code>[Release] vX.Y.Z</code>.</li>
+<li><strong>Run extended CI</strong> by labeling the PR with <code>ci-all</code> and commenting <code>/ci</code>. Investigate and resolve any failures.</li>
+<li><strong>Merge the release PR</strong> once notes are final and CI is green.</li>
+<li>
+<p><strong>Tag the release</strong> from the branch you just merged into:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main<span class="w">          </span><span class="c1"># minor/major releases</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>stable/vX.Y.Z<span class="w"> </span><span class="c1"># patch releases</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>pull
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>git<span class="w"> </span>tag<span class="w"> </span>vX.Y.Z<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Release vX.Y.Z&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>vX.Y.Z
+</code></pre></div>
+<p>Pushing the tag publishes to PyPI and deploys the documentation.</p>
+</li>
+<li>
+<p><strong>Publish the GitHub release</strong> using the drafted notes, and confirm the docs site and PyPI listing reflect the new version.</p>
+</li>
+</ol>
+<h2 id="working-with-ci-labels-and-ci">Working with CI Labels and <code>/ci</code><a class="headerlink" href="#working-with-ci-labels-and-ci" title="Permanent link">&para;</a></h2>
+<p>GPU suites and example end-to-end runs are opt-in. To trigger them on a pull request:</p>
+<ol>
+<li>Apply the appropriate labels before issuing the command:<ul>
+<li><code>ci-all</code> for every repository-dispatch workflow.</li>
+<li><code>ci-gpu</code> for GPU integration tests (<code>tests-full.yml</code>).</li>
+<li><code>ci-apo</code>, <code>ci-calc-x</code>, <code>ci-spider</code>, <code>ci-unsloth</code>, <code>ci-compat</code> for the individual example pipelines.</li>
 </ul>
-<p>Before proceeding, make sure <code>uv</code> is installed.</p>
-<h3 id="minimal-developer-installation">Minimal Developer Installation<a class="headerlink" href="#minimal-developer-installation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/microsoft/agent-lightning
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>agent-lightning
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev
-</code></pre></div>
-<p>This command sets up a clean development environment with only the essential dependencies.</p>
-<h3 id="installing-all-extras-cpu-or-gpu">Installing All Extras (CPU or GPU)<a class="headerlink" href="#installing-all-extras-cpu-or-gpu" title="Permanent link">&para;</a></h3>
-<p><code>uv sync</code> can also handle algorithm-specific and example-specific dependencies in one step.</p>
-<p>For a CPU-only machine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--frozen<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>--extra<span class="w"> </span>apo<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>--extra<span class="w"> </span>verl<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span>--group<span class="w"> </span>dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span>--group<span class="w"> </span>torch-cpu<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span>--group<span class="w"> </span>torch-stable<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span>--group<span class="w"> </span>trl<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span>--group<span class="w"> </span>agents<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span>--no-default-groups
-</code></pre></div>
-<p>For a GPU-equipped machine that is CUDA 12.8 compatible:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--frozen<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--extra<span class="w"> </span>apo<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>--extra<span class="w"> </span>verl<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>--group<span class="w"> </span>dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>--group<span class="w"> </span>torch-gpu-stable<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>--group<span class="w"> </span>trl<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span>--group<span class="w"> </span>agents<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span>--no-default-groups
-</code></pre></div>
-<p>Read more about Agent-lightning managed dependency groups <a href="https://github.com/microsoft/agent-lightning/tree/cab5c4c9201b1b9dafda31cb513f697a5a33a95d/pyproject.toml">here</a>.</p>
-<h3 id="activating-your-environment">Activating Your Environment<a class="headerlink" href="#activating-your-environment" title="Permanent link">&para;</a></h3>
-<p>After syncing dependencies, <code>uv</code> automatically creates a virtual environment inside the <code>.venv/</code> directory.</p>
-<p>You can use it in two ways:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Option 1: Prefix commands with uv run</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>your_script.py
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Option 2: Activate the virtual environment</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>python<span class="w"> </span>your_script.py
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Before Contributing</p>
-<p>Agent-Lightning enforces code style and linting rules via <strong>pre-commit hooks</strong>.
-Installing them early prevents many avoidable formatting issues.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pre-commit<span class="w"> </span>install
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files<span class="w"> </span>--show-diff-on-failure<span class="w"> </span>--color<span class="o">=</span>always
+</li>
+<li>Comment <code>/ci</code> on the PR. The <code>issue-comment</code> workflow acknowledges the request and tracks job results inline.</li>
+<li>Remove the labels once you have the signal to avoid accidental re-runs.</li>
+</ol>
+<p>Use <code>/ci</code> whenever changes touch shared infrastructure, dependencies, or training loops that require coverage beyond the default PR checks.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>/ci</code> always executes the workflow definitions on the current <code>main</code> branch, then checks out the PR diff. If you need to test workflow modifications, push the changes to a branch in the upstream repo and run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>examples-xxx.yml<span class="w"> </span>--ref<span class="w"> </span>your-branch-name
 </code></pre></div>
 </div>
+<h2 id="backporting-pull-requests">Backporting Pull Requests<a class="headerlink" href="#backporting-pull-requests" title="Permanent link">&para;</a></h2>
+<p>Supported stable branches rely on automated backports:</p>
+<ol>
+<li>Identify the target branch (for example <code>stable/v0.2.x</code>).</li>
+<li>Before merging the original PR into <code>main</code>, add the matching <code>stable/&lt;series&gt;</code> label (e.g. <code>stable/v0.2.x</code>).</li>
+<li>The <code>backport.yml</code> workflow opens a follow-up PR named <code>backport/&lt;original-number&gt;/&lt;target-branch&gt;</code> authored by <code>agent-lightning-bot</code>.</li>
+<li>Review the generated PR, ensure CI is green, and merge into the stable branch.</li>
+<li>Resolve conflicts by pushing manual fixes to the backport branch and re-running <code>/ci</code> if required.</li>
+</ol>
+<p>Keep stable branches healthy by cherry-picking only critical fixes and ensuring documentation and example metadata stay aligned with each release line.</p>
 
 <!-- Was this page helpful? -->
 
