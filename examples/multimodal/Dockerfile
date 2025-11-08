@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install -r agent-lightning/examples/multimodal/requirements.txt .[agents]
+RUN pip install -r examples/multimodal/requirements.txt .[agents]
 
 RUN apt-get update && \
     apt-get install -y EdgeBox-linux-x64 && \
