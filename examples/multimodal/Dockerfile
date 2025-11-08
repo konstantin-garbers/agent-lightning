@@ -12,6 +12,6 @@ RUN apt-get update && \
     rm EdgeBox-linux-x64
 
 COPY entrypoint.sh .
-RUN chmod +x ./entrypoint.sh
+RUN chmod +x ./examples/multimodal/entrypoint.sh
 
-CMD ["./entrypoint.sh"]
+CMD ["./examples/multimodal/entrypoint.sh"]

@@ -10,4 +10,4 @@ sleep 3
 # Run the main python application in the foreground
 # This keeps the container running
 echo "Starting multimodal agent..."
-python3 examples/multimodal_agent.py
+python3 multimodal_agent.py
