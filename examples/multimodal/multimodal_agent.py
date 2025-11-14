@@ -233,9 +233,8 @@ class MultiModalAgent:
 
     def should_continue(self, state: State) -> Literal[END, "tool_node"]:  # type: ignore
         messages = state["messages"]
-        last_message = messages[-1]
 
-        if state["agent_error"] or self.max_turns == state["num_turns"] or not last_message.tool_calls:  # type: ignore
+        if state["agent_error"] or self.max_turns == state["num_turns"] or not messages or not messages[-1].tool_calls:  # type: ignore
             return END
 
         return "tool_node"
@@ -247,7 +246,7 @@ class MultiModalAgent:
         builder.add_node(self.tool_node)  # type: ignore
         builder.add_node(self.screenshot_node)  # type: ignore
 
-        builder.add_edge(START, "agent_node")
+        builder.add_edge(START, "screenshot_node")
         builder.add_edge("screenshot_node", "agent_node")
         builder.add_edge("tool_node", "screenshot_node")
         builder.add_conditional_edges("agent_node", self.should_continue)  # type: ignore
