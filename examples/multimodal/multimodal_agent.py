@@ -163,6 +163,7 @@ class MultiModalAgent:
                 }
             )
             result = await self.llm.ainvoke(prompt)  # type: ignore
+            logger.info("Agent response: %s", result)
             return {"messages": [result], "num_turns": current_turns, "agent_error": None}
 
         except Exception as e:
@@ -265,7 +266,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.val_temperature = val_temperature
         self.max_turns = max_turns
         self.debug = debug
-
+    
     async def rollout_async(self, task, resources, rollout) -> float | None:
         def _filter_tools(tools: list[BaseTool]) -> list[BaseTool]:
             ACCEPTED_TOOL_NAME_LIST = [

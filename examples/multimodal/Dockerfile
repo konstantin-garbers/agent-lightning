@@ -12,9 +12,6 @@ ENV ALL_PROXY=$ALL_PROXY
 ENV NO_PROXY=$NO_PROXY
 ENV no_proxy=$no_proxy
 
-ENV GLOBAL_AGENT_HTTP_PROXY=$HTTP_PROXY
-ENV ELECTRON_GET_USE_PROXY=$HTTP_PROXY
-
 WORKDIR /app
 
 RUN apt-get update && \
@@ -23,17 +20,15 @@ RUN apt-get update && \
     # Install Node.js (which includes npm)
     apt-get install -y nodejs
 
-RUN git clone https://github.com/konstantin-garbers/EdgeBox
-WORKDIR /app/EdgeBox
-RUN npm install
-
 WORKDIR /app
 RUN git clone -b multimodal-example https://github.com/konstantin-garbers/agent-lightning
 WORKDIR /app/agent-lightning
 COPY .env .env
 RUN pip install -r examples/multimodal/requirements.txt .[agents]
+
 WORKDIR /app/agent-lightning/examples/multimodal/data_generation
-RUN curl -L -o gui_agent_dataset.parquet https://drive.usercontent.google.com/u/0/uc?id=1ndmi2zUAFuQN9mJENBrXlwzmEtJujgly&export=download
+RUN pip install gdown
+RUN gdown --id '1ndmi2zUAFuQN9mJENBrXlwzmEtJujgly' -O gui_agent_dataset.parquet
 
 WORKDIR /app
 RUN apt-get install -y xvfb
