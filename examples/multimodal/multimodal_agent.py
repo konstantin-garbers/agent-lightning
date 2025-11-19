@@ -401,10 +401,9 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
 def debug_multimodal_agent():
     load_dotenv()
 
-    gui_agent_dataset_data_path = os.path.join("examples", "multimodal", "data_generation", "gui_agent_dataset.parquet")
     PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
     gui_agent_dataset_data_path = (
-        PROJECT_ROOT / "examples" / "multimodal" / "data_generation" / "gui_agent_dataset.parquet"
+        PROJECT_ROOT / "examples" / "multimodal" / "data" / "gui_agent_dataset.parquet"
     )
     df = pd.read_parquet(gui_agent_dataset_data_path).head(1)  # type: ignore
     df = cast(list[Dict[str, Any]], df.to_dict(orient="records"))  # type: ignore

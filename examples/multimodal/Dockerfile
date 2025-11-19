@@ -22,11 +22,10 @@ RUN apt-get update && \
 
 WORKDIR /app
 RUN git clone -b multimodal-example https://github.com/konstantin-garbers/agent-lightning
-WORKDIR /app/agent-lightning
 COPY .env .env
 RUN pip install -r examples/multimodal/requirements.txt .[agents]
 
-WORKDIR /app/agent-lightning/examples/multimodal/data_generation
+WORKDIR /app/examples/multimodal/data_generation
 RUN pip install gdown
 RUN gdown --id '1ndmi2zUAFuQN9mJENBrXlwzmEtJujgly' -O gui_agent_dataset.parquet
 
