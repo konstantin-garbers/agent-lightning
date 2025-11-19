@@ -25,9 +25,10 @@ RUN git clone -b multimodal-example https://github.com/konstantin-garbers/agent-
 COPY .env .env
 RUN pip install -r examples/multimodal/requirements.txt .[agents]
 
-WORKDIR /app/examples/multimodal/data_generation
+WORKDIR /app/examples/multimodal/data
 RUN pip install gdown
-RUN gdown --id '1ndmi2zUAFuQN9mJENBrXlwzmEtJujgly' -O gui_agent_dataset.parquet
+RUN gdown --id '18T5Meu-bABrKz9zhTT_yRJr2oaaTrskh'
+RUN gdown --id '1mZ2NhoIq0fKLZzMrNQhmIfQgXweEZmFm'
 
 WORKDIR /app
 RUN git clone https://github.com/volcengine/verl

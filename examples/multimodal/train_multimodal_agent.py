@@ -32,8 +32,8 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         "use_kl_in_reward": False,
     },
     "data": {
-        "train_files": "data/train_multimodal.parquet",
-        "val_files": "data/test_multimodal.parquet",
+        "train_files": "data/train_set.parquet",
+        "val_files": "data/validation_set.parquet",
         "train_batch_size": 32,
         "max_prompt_length": 4096,
         "max_response_length": 2048,
@@ -116,7 +116,7 @@ def config_train_fast() -> Dict[str, Any]:
     config = deepcopy(RL_TRAINING_CONFIG)
     config["actor_rollout_ref"]["rollout"]["gpu_memory_utilization"] = 0.6
     config["actor_rollout_ref"]["model"]["path"] = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
-    config["data"]["val_files"] = "data/test_dev.parquet"
+    config["data"]["val_files"] = "data/validation_set.parquet"
     config["trainer"]["total_epochs"] = 1
     config["trainer"]["total_training_steps"] = 1
     config["trainer"]["experiment_name"] = EXPERIMENT_NAME
