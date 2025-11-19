@@ -30,6 +30,11 @@ RUN pip install gdown
 RUN gdown --id '1ndmi2zUAFuQN9mJENBrXlwzmEtJujgly' -O gui_agent_dataset.parquet
 
 WORKDIR /app
+RUN git clone https://github.com/volcengine/verl
+WORKDIR /app/verl
+RUN pip3 install --no-deps -e .
+
+WORKDIR /app
 RUN apt-get install -y xvfb
 RUN apt-get install -y docker.io
 
