@@ -4,13 +4,15 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG ALL_PROXY
 ARG NO_PROXY
-ARG no_proxy
 
 ENV HTTP_PROXY=$HTTP_PROXY
+ENV http_proxy=${HTTP_PROXY}}
 ENV HTTPS_PROXY=$HTTPS_PROXY
-ENV ALL_PROXY=$ALL_PROXY
+ENV https_proxy=${HTTPS_PROXY}}
 ENV NO_PROXY=$NO_PROXY
-ENV no_proxy=$no_proxy
+ENV no_proxy=${NO_PROXY}
+ENV ALL_PROXY=$ALL_PROXY
+ENV HF_HUB_DISABLE_XET=1
 
 WORKDIR /app
 
@@ -22,10 +24,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 RUN git clone -b multimodal-example https://github.com/konstantin-garbers/agent-lightning
+WORKDIR /app/agent-lightning
 COPY .env .env
 RUN pip install -r examples/multimodal/requirements.txt .[agents]
 
-WORKDIR /app/examples/multimodal/data
+WORKDIR /app/agent-lightning/examples/multimodal/data
 RUN pip install gdown
 RUN gdown --id '18T5Meu-bABrKz9zhTT_yRJr2oaaTrskh'
 RUN gdown --id '1mZ2NhoIq0fKLZzMrNQhmIfQgXweEZmFm'
