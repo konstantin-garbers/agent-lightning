@@ -292,7 +292,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             logger.info(f"[Rollout {rollout.rollout_id}] Starting rollout for task: {task}")
 
         rollout_id = rollout.rollout_id
-        agent_llm: LLM = cast(LLM, resources["agent_llm"])
+        llm: LLM = cast(LLM, resources["main_llm"])
         session_id = str(uuid.uuid4())
         server_name = SERVER_NAME + "-" + session_id
         client = MultiServerMCPClient(
@@ -312,7 +312,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             agent = MultiModalAgent(
                 max_turns=self.max_turns,
                 debug=self.debug,
-                endpoint=agent_llm.get_base_url(rollout.rollout_id, rollout.attempt.attempt_id),  # type: ignore
+                endpoint=llm.get_base_url(rollout.rollout_id, rollout.attempt.attempt_id),  # type: ignore
                 tools=tools,
                 session=session,
                 session_id=session_id,
@@ -335,7 +335,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             return 0.0
 
 
-        evaluation_llm: LLM = cast(LLM, resources["agent_llm"])
+        evaluation_llm: LLM = cast(LLM, resources["agent_llm"]) if "agent_llm" in resources else llm
         reward = await self._evaluate_with_llm(result, task, evaluation_llm)
         logger.info(f"[Rollout {rollout_id}] Final LLM-evaluated reward: {reward}")
         return reward
@@ -426,7 +426,7 @@ def debug_multimodal_agent():
 
     Trainer(
         n_workers=3,
-        initial_resources={"agent_llm": agent_llm, "evaluation_llm": evaluation_llm},
+        initial_resources={"main_llm": agent_llm, "evaluation_llm": evaluation_llm},
     ).dev(LitMultimodalAgent(debug=True, max_turns=3), df)
 
 

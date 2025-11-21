@@ -45,7 +45,6 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
             "n": 4,
             "log_prob_micro_batch_size_per_gpu": 4,
             "multi_turn": {"format": "hermes"},
-            "name": "vllm",
             "gpu_memory_utilization": 0.8,
             "engine_kwargs": {
                 "vllm": {
@@ -63,6 +62,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
             "entropy_coeff": 0,
             "clip_ratio_low": 0.2,
             "clip_ratio_high": 0.3,
+            "strategy": "async",
             "fsdp_config": {
                 "param_offload": True,
                 "optimizer_offload": True,
@@ -116,7 +116,6 @@ def config_train_fast() -> Dict[str, Any]:
     config = deepcopy(RL_TRAINING_CONFIG)
     config["actor_rollout_ref"]["rollout"]["gpu_memory_utilization"] = 0.6
     config["actor_rollout_ref"]["model"]["path"] = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
-    config["data"]["val_files"] = "data/validation_set.parquet"
     config["trainer"]["total_epochs"] = 1
     config["trainer"]["total_training_steps"] = 1
     config["trainer"]["experiment_name"] = EXPERIMENT_NAME
