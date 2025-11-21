@@ -41,11 +41,14 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
     },
     "actor_rollout_ref": {
         "rollout": {
+            # Defines across how many GPU the model is split
             "tensor_model_parallel_size": 1,
+            # Number of rollouts per task. Used in GRPO to calculate advantages.
             "n": 4,
             "log_prob_micro_batch_size_per_gpu": 4,
             "multi_turn": {"format": "hermes"},
-            "gpu_memory_utilization": 0.8,
+            "gpu_memory_utilization": 0.6,
+            "name": "vllm",
             "engine_kwargs": {
                 "vllm": {
                     "enable_auto_tool_choice": True,
@@ -84,7 +87,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         "critic_warmup": 0,
         "logger": ["console", "wandb"],
         "project_name": "AgentLightning",
-        "experiment_name": "spider",
+        "experiment_name": "multimodal",
         "nnodes": 1,
         "test_freq": 32,
         "total_epochs": 2,
