@@ -49,6 +49,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
             "multi_turn": {"format": "hermes"},
             "gpu_memory_utilization": 0.6,
             "name": "vllm",
+            "mode": "async",
             "engine_kwargs": {
                 "vllm": {
                     "enable_auto_tool_choice": True,
@@ -65,7 +66,6 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
             "entropy_coeff": 0,
             "clip_ratio_low": 0.2,
             "clip_ratio_high": 0.3,
-            "strategy": "async",
             "fsdp_config": {
                 "param_offload": True,
                 "optimizer_offload": True,
@@ -117,7 +117,6 @@ def config_train_fast() -> Dict[str, Any]:
     print(f"EXPERIMENT_NAME={EXPERIMENT_NAME}")
 
     config = deepcopy(RL_TRAINING_CONFIG)
-    config["actor_rollout_ref"]["rollout"]["gpu_memory_utilization"] = 0.6
     config["actor_rollout_ref"]["model"]["path"] = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
     config["trainer"]["total_epochs"] = 1
     config["trainer"]["total_training_steps"] = 1
@@ -138,7 +137,7 @@ def train(config: Dict[str, Any], active_agent: Optional[str]) -> None:
 
     agent = LitMultimodalAgent()
     algorithm = agl.VERL(config)
-    trainer = agl.Trainer(n_runners=10, algorithm=algorithm, adapter={"agent_match": active_agent})
+    trainer = agl.Trainer(n_runners=4, algorithm=algorithm, adapter={"agent_match": active_agent})
     print("Adapter agent match acknowledged:", trainer.adapter.agent_match)  # type: ignore
 
     train_data = pd.read_parquet(config["data"]["train_files"]).to_dict(orient="records")  # type: ignore
