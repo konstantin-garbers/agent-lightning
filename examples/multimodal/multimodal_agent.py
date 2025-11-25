@@ -106,6 +106,7 @@ class MultiModalAgent:
         max_turns: int = 5,
         debug: bool = False,
         endpoint: str | None = None,
+        verl_replacement: Dict[str, Any] | None = None,
     ):
         self.debug = debug
         self.max_turns = max_turns
@@ -113,11 +114,34 @@ class MultiModalAgent:
         self.session = session
         self.session_id = session_id
         self.client = client
+        if verl_replacement is not None:
+            self.model_name: str = verl_replacement["model"]  # type: ignore
+            assert endpoint is not None
+            self.llm = init_chat_model(
+                self.model_name,
+                model_provider="openai",
+                openai_api_base=endpoint,
+                openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
+                temperature=verl_replacement["temperature"],
+                max_retries=0,
+                max_tokens=2048,
+            )
+        else:
+            self.model_name: str = os.environ.get("MODEL", "gpt-4.1-mini")
+            self.llm = init_chat_model(
+                self.model_name,
+                model_provider="openai",
+                openai_api_base=endpoint or os.environ["OPENAI_API_BASE"],
+                openai_api_key=os.environ["OPENAI_API_KEY"],
+                temperature=0,
+                max_retries=1,
+                max_tokens=2048,
+            )
         self.llm = init_chat_model(  # type: ignore
             self.model_name,
             model_provider="openai",
             openai_api_base=endpoint or os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
-            openai_api_key=os.environ["OPENAI_API_KEY"],
+            openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
             temperature=0,
             max_retries=1,
             max_tokens=2048,
@@ -317,6 +341,19 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 session=session,
                 session_id=session_id,
                 client=client,
+                verl_replacement=(
+                    {"model": llm.model, **llm.sampling_parameters}
+                    if rollout.mode == "train"
+                    else {
+                        "model": llm.model,
+                        "temperature": (
+                            self.val_temperature
+                            if self.val_temperature is not None
+                            else llm.sampling_parameters.get("temperature", 0.0)
+                        ),
+                    }
+                ),
+ 
             ).graph()
 
             try:

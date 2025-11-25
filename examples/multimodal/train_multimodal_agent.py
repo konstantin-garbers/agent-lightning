@@ -98,9 +98,9 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
 def config_train_fast() -> Dict[str, Any]:
     """A fast training run for CI testing purposes."""
 
-    # `EXPERIMENT_NAME="spider_$(date +%Y%m%d%H%M%S)"`
+    # `EXPERIMENT_NAME="multimodaL_$(date +%Y%m%d%H%M%S)"`
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    EXPERIMENT_NAME = f"spider_{timestamp}"
+    EXPERIMENT_NAME = f"multimodal_{timestamp}"
 
     # `PROJECT_NAME=AgentLightningCI`
     PROJECT_NAME = "AgentLightningCI"
@@ -148,7 +148,7 @@ def train(config: Dict[str, Any], active_agent: Optional[str]) -> None:
 def main() -> None:
     """Main function to parse arguments and run training."""
     parser = argparse.ArgumentParser(
-        description="Train an multimodal agent on the Spider dataset using different model configurations"
+        description="Train an multimodal agent using different model configurations"
     )
 
     parser.add_argument(
