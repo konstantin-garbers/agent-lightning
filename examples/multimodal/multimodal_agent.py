@@ -23,6 +23,7 @@ from mcp.types import CallToolResult
 from agentlightning import Trainer, LitAgent, configure_logger, LLM
 
 from dotenv import load_dotenv
+from screenshot_utils import save_screenshot
 
 logger = configure_logger()
 
@@ -107,13 +108,22 @@ class MultiModalAgent:
         debug: bool = False,
         endpoint: str | None = None,
         verl_replacement: Dict[str, Any] | None = None,
+        output_folder: str | None = None,
+        rollout_id: str | None = None,
+        tool_message_truncate: int = 2048,
+        message_history_limit: int | None = None,
     ):
         self.debug = debug
         self.max_turns = max_turns
-        self.model_name: str = os.environ.get("MODEL", "gpt-5-mini")
         self.session = session
         self.session_id = session_id
         self.client = client
+        # Automatically save screenshots when debug is enabled
+        self.output_folder = output_folder or ("./screenshots" if debug else None)
+        self.rollout_id = rollout_id
+        self.tool_message_truncate = tool_message_truncate
+        self.message_history_limit = message_history_limit
+        
         if verl_replacement is not None:
             self.model_name: str = verl_replacement["model"]  # type: ignore
             assert endpoint is not None
@@ -131,21 +141,15 @@ class MultiModalAgent:
             self.llm = init_chat_model(
                 self.model_name,
                 model_provider="openai",
-                openai_api_base=endpoint or os.environ["OPENAI_API_BASE"],
-                openai_api_key=os.environ["OPENAI_API_KEY"],
+                openai_api_base=endpoint or os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
+                openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
                 temperature=0,
                 max_retries=1,
                 max_tokens=2048,
             )
-        self.llm = init_chat_model(  # type: ignore
-            self.model_name,
-            model_provider="openai",
-            openai_api_base=endpoint or os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
-            openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
-            temperature=0,
-            max_retries=1,
-            max_tokens=2048,
-        ).bind_tools(
+        
+        # Bind tools to the LLM
+        self.llm = self.llm.bind_tools(  # type: ignore
             tools=tools,
             tool_choice="any",
         )  # type: ignore
@@ -166,24 +170,49 @@ class MultiModalAgent:
 
         return data_blocks  # type: ignore
 
+    def truncate_tool_message(self, content: str) -> str:
+        """Truncate tool message content to a reasonable length."""
+        if len(content) > self.tool_message_truncate:
+            return content[: self.tool_message_truncate] + "\n... (truncated)"
+        return content
+
     def _CallToolResult_to_ToolMessage(self, response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
         text_blocks = self._parse_mcp_content(response, content_type="text")
 
         if text_blocks:
             content_str = json.dumps(text_blocks)
+            content_str = self.truncate_tool_message(content_str)
         else:
             content_str = "No text output from tool."
 
         return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
 
+    def _truncate_message_history(self, messages: list[Any]) -> list[Any]:
+        """Truncate message history to keep only recent messages if limit is set."""
+        if self.message_history_limit is None or len(messages) <= self.message_history_limit:
+            return messages
+        
+        # Keep the first message (usually the task/system message) and the most recent messages
+        # This preserves context while limiting size
+        if len(messages) > 1:
+            # Keep first message and last (message_history_limit - 1) messages
+            truncated = [messages[0]] + messages[-(self.message_history_limit - 1):]
+            if self.debug:
+                logger.info(f"Truncated message history from {len(messages)} to {len(truncated)} messages")
+            return truncated
+        return messages
+
     async def agent_node(self, state: State) -> dict["str", Any]:
         current_turns = state.get("num_turns", 0) + 1
 
         try:
+            messages = state.get("messages", [])  # type: ignore
+            messages = self._truncate_message_history(messages)
+            
             prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
                 {
                     "task": state["task"],  # type: ignore
-                    "messages": state.get("messages", []),  # type: ignore
+                    "messages": messages,
                 }
             )
             result = await self.llm.ainvoke(prompt)  # type: ignore
@@ -230,6 +259,17 @@ class MultiModalAgent:
             return {"messages": []}
 
         image_url = f"data:{media_type};base64,{base64_data}"
+        
+        # Save screenshot to file if output folder is specified (automatically set when debug=True)
+        if self.output_folder:
+            save_screenshot(
+                base64_data=base64_data,
+                output_folder=self.output_folder,
+                rollout_id=self.rollout_id,
+                session_id=self.session_id,
+                debug=self.debug,
+            )
+        
         image_message = HumanMessage(
             content=[
                 {"type": "text", "text": "Here is the current state of the desktop encoded using base64."},
@@ -285,11 +325,17 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         val_temperature: Optional[float] = None,
         max_turns: int = 3,
         debug: bool = False,
+        output_folder: str | None = None,
+        tool_message_truncate: int = 2048,
+        message_history_limit: int | None = None,
     ) -> None:
         super().__init__()
         self.val_temperature = val_temperature
         self.max_turns = max_turns
         self.debug = debug
+        self.output_folder = output_folder
+        self.tool_message_truncate = tool_message_truncate
+        self.message_history_limit = message_history_limit
     
     async def rollout_async(self, task, resources, rollout) -> float | None:
         def _filter_tools(tools: list[BaseTool]) -> list[BaseTool]:
@@ -353,7 +399,10 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                         ),
                     }
                 ),
- 
+                output_folder=self.output_folder,
+                rollout_id=rollout_id,
+                tool_message_truncate=self.tool_message_truncate,
+                message_history_limit=self.message_history_limit,
             ).graph()
 
             try:
@@ -464,7 +513,7 @@ def debug_multimodal_agent():
     Trainer(
         n_workers=3,
         initial_resources={"main_llm": agent_llm, "evaluation_llm": evaluation_llm},
-    ).dev(LitMultimodalAgent(debug=True, max_turns=3), df)
+    ).dev(LitMultimodalAgent(debug=True, max_turns=10), df)
 
 
 if __name__ == "__main__":

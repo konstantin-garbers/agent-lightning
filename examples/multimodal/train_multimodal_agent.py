@@ -132,10 +132,10 @@ def config_train_qwen() -> Dict[str, Any]:
     config = deepcopy(RL_TRAINING_CONFIG)
     return config
 
-def train(config: Dict[str, Any], active_agent: Optional[str]) -> None:
+def train(config: Dict[str, Any], active_agent: Optional[str], output_folder: Optional[str] = None) -> None:
     """Train the multimodal agent with the given configuration."""
 
-    agent = LitMultimodalAgent()
+    agent = LitMultimodalAgent(output_folder=output_folder)
     algorithm = agl.VERL(config)
     trainer = agl.Trainer(n_runners=4, algorithm=algorithm, adapter={"agent_match": active_agent})
     print("Adapter agent match acknowledged:", trainer.adapter.agent_match)  # type: ignore
@@ -161,6 +161,19 @@ def main() -> None:
         "--active-agent", type=str, help="Override the active agent name (default: auto-generated based on config)"
     )
 
+    parser.add_argument(
+        "--save-screenshot",
+        action="store_true",
+        help="Enable saving screenshots as JPG files (default: False)",
+    )
+
+    parser.add_argument(
+        "--screenshot-output-folder",
+        type=str,
+        default="./screenshots",
+        help="Folder path to save screenshot images as JPG files (default: ./screenshots)",
+    )
+
     args = parser.parse_args()
 
     # Get the appropriate configuration
@@ -171,10 +184,15 @@ def main() -> None:
     # Set active agent - use provided value or default based on config choice
     active_agent = args.active_agent
 
+    # Determine output folder based on save-screenshot flag
+    output_folder = args.screenshot_output_folder if args.save_screenshot else None
+
     print(f"Starting training with '{args.config}' configuration...")
     print(f"Active agent: {active_agent}")
+    if args.save_screenshot:
+        print(f"Screenshots will be saved to: {output_folder}")
 
-    train(config, active_agent)
+    train(config, active_agent, output_folder)
 
 
 if __name__ == "__main__":
