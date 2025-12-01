@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import uuid
 import os
 from typing import Any, Dict, Optional, cast, Literal
-from langchain_core.prompts import ChatPromptTemplate
 
 import pandas as pd
 
@@ -16,78 +14,24 @@ from langgraph.graph import START, END, MessagesState, StateGraph
 from langchain_core.messages import AIMessage, ToolMessage, ToolCall, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
+from multimodal_hooks import MultimodalHook
+from multimodal_prompts import AGENT_PROMPT, EVALUATION_PROMPT
+
 from langchain_mcp_adapters.client import MultiServerMCPClient, BaseTool, ClientSession
 
-from mcp.types import CallToolResult
-
-from agentlightning import Trainer, LitAgent, configure_logger, LLM
+from agentlightning import LitAgent, configure_logger, LLM, Hook
 
 from dotenv import load_dotenv
-from screenshot_utils import save_screenshot
+from utils import (
+    call_tool_result_to_tool_message,
+    parse_mcp_content,
+    save_screenshot,
+    truncate_message_history,
+)
 
 logger = configure_logger()
 
 SERVER_NAME = "edgebox-sandbox"
-
-AGENT_PROMPT = ChatPromptTemplate(
-    [
-        (
-            "system",
-            """You are an autonomous GUI agent. Your sole purpose is to complete the user's task by issuing MCP protocol actions.
-
-You will operate in a loop:
-1.  **Observe:** You will be given the current state of the desktop as a screenshot (in a HumanMessage).
-2.  **Think:** Analyze this screenshot, the original task (from the user), and the results of your previous actions (from ToolMessages). Formulate a step-by-step plan.
-3.  **Act:** Based on your plan, select **one single tool** to execute.
-4.  **Repeat:** You will get a new screenshot and the result of your action, and the loop will continue.
-
-**Important Rules:**
-* Pay close attention to the `ToolMessage` results. They tell you if your last action was successful or if an error occurred.
-* Base every action on the **most recent screenshot**.
-* When you believe the task is fully complete, respond with only text (no tool call) to finish the mission.""",
-        ),
-        ("user", "Task: {task}"),
-        ("placeholder", "{messages}"),
-    ]
-)
-
-EVALUATION_PROMPT = ChatPromptTemplate(
-    [
-        (
-            "system",
-            """You are an expert evaluator for a GUI agent. 
-Your goal is to determine if the agent's final screenshot matches the expected outcome of the task.
-Respond *only* with a JSON object in the following format:
-{{
-    "reasoning": "A brief explanation of your decision, comparing the screenshot to the expected outcome.",
-    "score": <1 if the task was completed successfully otherwise a 0>
-}}""",
-        ),
-        (
-            "user",
-            [
-                {
-                    "type": "text",
-                    "text": """
-Please evaluate the following:
-
-**Original Task:**
-{task}
-
-**Expected Outcome (Ground Truth):**
-{answer}
-
-**Final Screenshot:**
-""",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {"url": "{image_url}"},
-                },
-            ],
-        ),
-    ]
-)
 
 
 class State(MessagesState):
@@ -154,60 +98,13 @@ class MultiModalAgent:
             tool_choice="any",
         )  # type: ignore
 
-    def _parse_mcp_content(self, response: CallToolResult, content_type: str = "text") -> list[str]:
-        data_blocks = []
-        if not response.content:
-            return data_blocks  # type: ignore
-
-        for mcp_block in response.content:
-            data_key = "text" if content_type == "text" else "data"
-
-            if isinstance(mcp_block, dict):
-                if mcp_block.get("type") == content_type:  # type: ignore
-                    data_blocks.append(mcp_block.get(data_key, ""))  # type: ignore
-            elif getattr(mcp_block, "type", None) == content_type:
-                data_blocks.append(getattr(mcp_block, data_key, ""))  # type: ignore
-
-        return data_blocks  # type: ignore
-
-    def truncate_tool_message(self, content: str) -> str:
-        """Truncate tool message content to a reasonable length."""
-        if len(content) > self.tool_message_truncate:
-            return content[: self.tool_message_truncate] + "\n... (truncated)"
-        return content
-
-    def _CallToolResult_to_ToolMessage(self, response: CallToolResult, original_tool_call_id: str) -> ToolMessage:
-        text_blocks = self._parse_mcp_content(response, content_type="text")
-
-        if text_blocks:
-            content_str = json.dumps(text_blocks)
-            content_str = self.truncate_tool_message(content_str)
-        else:
-            content_str = "No text output from tool."
-
-        return ToolMessage(content=content_str, tool_call_id=original_tool_call_id)
-
-    def _truncate_message_history(self, messages: list[Any]) -> list[Any]:
-        """Truncate message history to keep only recent messages if limit is set."""
-        if self.message_history_limit is None or len(messages) <= self.message_history_limit:
-            return messages
-        
-        # Keep the first message (usually the task/system message) and the most recent messages
-        # This preserves context while limiting size
-        if len(messages) > 1:
-            # Keep first message and last (message_history_limit - 1) messages
-            truncated = [messages[0]] + messages[-(self.message_history_limit - 1):]
-            if self.debug:
-                logger.info(f"Truncated message history from {len(messages)} to {len(truncated)} messages")
-            return truncated
-        return messages
 
     async def agent_node(self, state: State) -> dict["str", Any]:
         current_turns = state.get("num_turns", 0) + 1
 
         try:
             messages = state.get("messages", [])  # type: ignore
-            messages = self._truncate_message_history(messages)
+            messages = truncate_message_history(messages, self.message_history_limit, self.debug)
             
             prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
                 {
@@ -229,8 +126,8 @@ class MultiModalAgent:
         try:
             response = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
 
-            # Just call the new helper method
-            return self._CallToolResult_to_ToolMessage(response, tool_call_id)
+            # Convert CallToolResult to ToolMessage using utility function
+            return call_tool_result_to_tool_message(response, tool_call_id, self.tool_message_truncate)
 
         except Exception as e:
             err_msg = f"Tool call {tool_call['name']} failed: {e}"
@@ -251,7 +148,7 @@ class MultiModalAgent:
             return {"messages": [error_msg]}
 
         media_type = "image/jpeg"
-        image_data_list = self._parse_mcp_content(response, content_type="image")
+        image_data_list = parse_mcp_content(response, content_type="image")
         base64_data = image_data_list[0] if image_data_list else ""
 
         if not base64_data:
@@ -319,6 +216,7 @@ class MultiModalAgent:
         return builder.compile()  # type: ignore
 
 
+
 class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
     def __init__(
         self,
@@ -336,47 +234,60 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.output_folder = output_folder
         self.tool_message_truncate = tool_message_truncate
         self.message_history_limit = message_history_limit
+        # Store session info per rollout (set up by hook, used in rollout_async, cleaned up by hook)
+        self._rollout_sessions: Dict[str, Dict[str, Any]] = {}
     
+    def get_hooks(self) -> list[Hook]:
+        """Get all hooks for this agent instance."""
+        return [MultimodalHook()]
+    
+    @classmethod
+    def create_trainer(cls, **trainer_kwargs: Any) -> Any:  # Return type is Trainer but avoid import
+        """Create a Trainer instance with hooks pre-configured.
+        
+        This method creates a Trainer with hooks configured for multimodal agents.
+        The hooks handle MCP client setup and cleanup automatically.
+        
+        Args:
+            **trainer_kwargs: Additional keyword arguments to pass to Trainer constructor.
+                Note: 'hooks' will be overridden with the multimodal agent hooks.
+        
+        Returns:
+            A Trainer instance with hooks configured for multimodal agent cleanup.
+        """
+        # Create a temporary agent instance to get hooks
+        temp_agent = cls()
+        hooks = temp_agent.get_hooks()
+        
+        # Remove hooks from kwargs if provided (we'll override it)
+        trainer_kwargs.pop("hooks", None)
+        
+        # Import here to avoid circular imports
+        import agentlightning as agl
+        
+        return agl.Trainer(hooks=hooks, **trainer_kwargs)
+
     async def rollout_async(self, task, resources, rollout) -> float | None:
-        def _filter_tools(tools: list[BaseTool]) -> list[BaseTool]:
-            ACCEPTED_TOOL_NAME_LIST = [
-                "desktop_mouse_click",
-                "desktop_mouse_double_click",
-                "desktop_mouse_move",
-                "desktop_mouse_scroll",
-                "desktop_mouse_drag",
-                "desktop_switch_window",
-                "desktop_get_windows",
-                "desktop_keyboard_type",
-            ]
-
-            result: list[BaseTool] = []
-            for tool in tools:
-                name = tool.get_name()
-                if name in ACCEPTED_TOOL_NAME_LIST:
-                    result.append(tool)
-
-            return result
-
         if self.debug:
             logger.info(f"[Rollout {rollout.rollout_id}] Starting rollout for task: {task}")
 
         rollout_id = rollout.rollout_id
         llm: LLM = cast(LLM, resources["main_llm"])
-        session_id = str(uuid.uuid4())
-        server_name = SERVER_NAME + "-" + session_id
-        client = MultiServerMCPClient(
-            {
-                server_name: {
-                    "transport": "streamable_http",
-                    "url": "http://localhost:8888/mcp",
-                    "headers": {"x-session-id": session_id},
-                }
-            }
-        )
-
-        tools: list[BaseTool] = await client.get_tools()
-        tools = _filter_tools(tools)
+        
+        # Retrieve session info that was set up by MultimodalHook
+        session_info = self._rollout_sessions.get(rollout_id)
+        if not session_info:
+            logger.error(f"[Rollout {rollout_id}] No session info found. Setup hook may have failed.")
+            return None
+        
+        client = session_info["client"]
+        server_name = session_info["server_name"]
+        session_id = session_info["session_id"]
+        tools: list[BaseTool] = session_info.get("tools", [])
+        
+        if not tools:
+            logger.warning(f"[Rollout {rollout_id}] No tools available. Setup hook may have failed.")
+            return None
 
         async with client.session(server_name) as session:
             agent = MultiModalAgent(
@@ -510,10 +421,12 @@ def debug_multimodal_agent():
         },
     )
 
-    Trainer(
-        n_workers=3,
+    agent = LitMultimodalAgent(debug=True, max_turns=5)
+    trainer = LitMultimodalAgent.create_trainer(
+        n_workers=6,
         initial_resources={"main_llm": agent_llm, "evaluation_llm": evaluation_llm},
-    ).dev(LitMultimodalAgent(debug=True, max_turns=10), df)
+    )
+    trainer.dev(agent, df)
 
 
 if __name__ == "__main__":

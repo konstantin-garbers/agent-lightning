@@ -137,7 +137,12 @@ def train(config: Dict[str, Any], active_agent: Optional[str], output_folder: Op
 
     agent = LitMultimodalAgent(output_folder=output_folder)
     algorithm = agl.VERL(config)
-    trainer = agl.Trainer(n_runners=4, algorithm=algorithm, adapter={"agent_match": active_agent})
+    # Use create_trainer to get a trainer with hooks pre-configured
+    trainer = LitMultimodalAgent.create_trainer(
+        n_runners=4,
+        algorithm=algorithm,
+        adapter={"agent_match": active_agent},
+    )
     print("Adapter agent match acknowledged:", trainer.adapter.agent_match)  # type: ignore
 
     train_data = pd.read_parquet(config["data"]["train_files"]).to_dict(orient="records")  # type: ignore
