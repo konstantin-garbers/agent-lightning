@@ -39,6 +39,7 @@ class State(MessagesState):
     execution: str
     num_turns: int
     agent_error: str
+    latest_screenshot: Optional[HumanMessage]
 
 
 class MultiModalAgent:
@@ -55,7 +56,7 @@ class MultiModalAgent:
         output_folder: str | None = None,
         rollout_id: str | None = None,
         tool_message_truncate: Optional[int] = None,
-        message_history_limit: int | None = None,
+        message_history_limit: Optional[int] = 12,
     ):
         self.debug = debug
         self.max_turns = max_turns
@@ -104,12 +105,17 @@ class MultiModalAgent:
 
         try:
             messages = state.get("messages", [])  # type: ignore
+            screenshot_message = state.get("latest_screenshot")  # type: ignore
             messages = truncate_message_history(messages, self.message_history_limit, self.debug)
-            
+            if screenshot_message is not None:
+                messages_for_prompt = [*messages, screenshot_message]
+            else:
+                messages_for_prompt = messages
+
             prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
                 {
                     "task": state["task"],  # type: ignore
-                    "messages": messages,
+                    "messages": messages_for_prompt,
                 }
             )
             result = await self.llm.ainvoke(prompt)  # type: ignore
@@ -177,7 +183,7 @@ class MultiModalAgent:
             ]
         )
 
-        return {"messages": [image_message], "execution": image_url}
+        return {"latest_screenshot": image_message, "execution": image_url}
 
     async def tool_node(self, state: State) -> dict["str", Any]:
         last_message = cast(AIMessage, state["messages"][-1])  # type: ignore
@@ -221,7 +227,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
     def __init__(
         self,
         val_temperature: Optional[float] = None,
-        max_turns: int = 3,
+        max_turns: int = 10,
         debug: bool = False,
         output_folder: str | None = None,
         tool_message_truncate: Optional[int] = None,
