@@ -101,7 +101,7 @@ def parse_mcp_content(response: CallToolResult, content_type: str = "text") -> l
     return data_blocks  # type: ignore
 
 
-def truncate_tool_message(content: str, max_length: int = 2048) -> str:
+def truncate_tool_message(content: str, max_length: int) -> str:
     """Truncate tool message content to a reasonable length.
     
     Args:
@@ -119,7 +119,7 @@ def truncate_tool_message(content: str, max_length: int = 2048) -> str:
 def call_tool_result_to_tool_message(
     response: CallToolResult,
     original_tool_call_id: str,
-    tool_message_truncate: int = 2048,
+    tool_message_truncate: Optional[int] = None,
 ) -> ToolMessage:
     """Convert a CallToolResult to a ToolMessage.
     
@@ -135,7 +135,8 @@ def call_tool_result_to_tool_message(
 
     if text_blocks:
         content_str = json.dumps(text_blocks)
-        content_str = truncate_tool_message(content_str, max_length=tool_message_truncate)
+        if tool_message_truncate is not None:
+            content_str = truncate_tool_message(content_str, max_length=tool_message_truncate)
     else:
         content_str = "No text output from tool."
 

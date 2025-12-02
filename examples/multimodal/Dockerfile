@@ -70,4 +70,6 @@ RUN gdown --id '1mZ2NhoIq0fKLZzMrNQhmIfQgXweEZmFm'
 
 # 9. Install Verl
 WORKDIR /app
-RUN pip install verl==0.5.0
+RUN pip install verl==0.6.0
+
+WORKDIR /app/agent-lightning

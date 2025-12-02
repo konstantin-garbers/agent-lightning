@@ -54,7 +54,7 @@ class MultiModalAgent:
         verl_replacement: Dict[str, Any] | None = None,
         output_folder: str | None = None,
         rollout_id: str | None = None,
-        tool_message_truncate: int = 2048,
+        tool_message_truncate: Optional[int] = None,
         message_history_limit: int | None = None,
     ):
         self.debug = debug
@@ -332,7 +332,12 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
             return 0.0
 
 
-        evaluation_llm: LLM = cast(LLM, resources["agent_llm"]) if "agent_llm" in resources else llm
+        if "evaluation_llm" in resources:
+            evaluation_llm = cast(LLM, resources["evaluation_llm"])
+        elif "agent_llm" in resources:
+            evaluation_llm = cast(LLM, resources["agent_llm"])
+        else:
+            evaluation_llm = llm
         reward = await self._evaluate_with_llm(result, task, evaluation_llm)
         logger.info(f"[Rollout {rollout_id}] Final LLM-evaluated reward: {reward}")
         return reward
@@ -367,14 +372,15 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
 
         response_content = ""
         try:
+            eval_api_key = os.environ.get("EVALUATION_LLM_API_KEY") or os.environ.get("OPENAI_API_KEY", "dummy")
             model = init_chat_model(
-                    model=evaluation_llm.model,
-                    model_provider="openai",
-                    openai_api_base=evaluation_llm.endpoint,  # Use the endpoint from the resource
-                    openai_api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
-                    temperature=0,
-                    max_tokens=512,
-                )
+                model=evaluation_llm.model,
+                model_provider="openai",
+                openai_api_base=evaluation_llm.endpoint,  # Use the endpoint from the resource
+                openai_api_key=eval_api_key,
+                temperature=0,
+                max_tokens=512,
+            )
             response = await model.ainvoke(prompt)  # type: ignore
             response_content = str(response.content)  # type: ignore
 
@@ -405,17 +411,19 @@ def debug_multimodal_agent():
     df = pd.read_parquet(gui_agent_dataset_data_path).head(1)  # type: ignore
     df = cast(list[Dict[str, Any]], df.to_dict(orient="records"))  # type: ignore
 
+    main_api_base = os.environ["OPENAI_API_BASE"]
     agent_llm = LLM(
         model=os.environ.get("AGENT_MODEL", "gpt-5-mini"),
-        endpoint=os.environ["OPENAI_API_BASE"],
+        endpoint=main_api_base,
         sampling_parameters={
             "temperature": 0.7,
         },
     )
 
+    evaluation_api_base = os.environ.get("EVALUATION_LLM_API_BASE", main_api_base)
     evaluation_llm = LLM(
         model=os.environ.get("EVALUATION_MODEL", "gpt-5-mini"),
-        endpoint=os.environ["OPENAI_API_BASE"],
+        endpoint=evaluation_api_base,
         sampling_parameters={
             "temperature": 0.7,
         },

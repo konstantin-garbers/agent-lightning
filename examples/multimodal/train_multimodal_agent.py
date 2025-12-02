@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 from copy import deepcopy
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -104,13 +103,6 @@ def config_train_fast() -> Dict[str, Any]:
 
     # `PROJECT_NAME=AgentLightningCI`
     PROJECT_NAME = "AgentLightningCI"
-
-    # Simulate writing to $GITHUB_OUTPUT if it’s set
-    github_output = os.getenv("GITHUB_OUTPUT")
-    if github_output:
-        with open(github_output, "a") as f:
-            f.write(f"project_name={PROJECT_NAME}\n")
-            f.write(f"run_name={EXPERIMENT_NAME}\n")
 
     print("Set environment variables:")
     print(f"PROJECT_NAME={PROJECT_NAME}")
