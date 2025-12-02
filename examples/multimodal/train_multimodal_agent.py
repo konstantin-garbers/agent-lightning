@@ -35,7 +35,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         "val_files": "data/validation_set.parquet",
         "train_batch_size": 32,
         "max_prompt_length": 4096,
-        "max_response_length": 2048,
+        "max_response_length": 4096,
         "truncation": "error",
     },
     "actor_rollout_ref": {

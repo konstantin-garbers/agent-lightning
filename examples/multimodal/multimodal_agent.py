@@ -224,7 +224,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         max_turns: int = 3,
         debug: bool = False,
         output_folder: str | None = None,
-        tool_message_truncate: int = 2048,
+        tool_message_truncate: Optional[int] = None,
         message_history_limit: int | None = None,
     ) -> None:
         super().__init__()
