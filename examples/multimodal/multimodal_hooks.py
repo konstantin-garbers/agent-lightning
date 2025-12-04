@@ -32,8 +32,6 @@ class MultimodalHook(Hook):
         "desktop_mouse_move",
         "desktop_mouse_scroll",
         "desktop_mouse_drag",
-        "desktop_switch_window",
-        "desktop_get_windows",
         "desktop_keyboard_type",
     ]
     

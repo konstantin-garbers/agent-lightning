@@ -56,7 +56,7 @@ class MultiModalAgent:
         output_folder: str | None = None,
         rollout_id: str | None = None,
         tool_message_truncate: Optional[int] = None,
-        message_history_limit: Optional[int] = 12,
+        message_history_limit: Optional[int] = 5,
     ):
         self.debug = debug
         self.max_turns = max_turns
@@ -96,7 +96,7 @@ class MultiModalAgent:
         # Bind tools to the LLM
         self.llm = self.llm.bind_tools(  # type: ignore
             tools=tools,
-            tool_choice="any",
+            tool_choice="required",
         )  # type: ignore
 
 
@@ -123,8 +123,14 @@ class MultiModalAgent:
             return {"messages": [result], "num_turns": current_turns, "agent_error": None}
 
         except Exception as e:
-            err_msg = f"Agent node failed {e}"
-            return {"agent_error": err_msg, "num_turns": current_turns}
+            err_msg = f"Agent node failed: {e}"
+            logger.exception(err_msg)
+            error_message = HumanMessage(content=err_msg)
+            return {
+                "messages": [error_message],
+                "agent_error": err_msg,
+                "num_turns": current_turns,
+            }
 
     async def invoke_tool(self, tool_call: ToolCall) -> ToolMessage:
         tool_call_id: str = tool_call.get("id") or ""

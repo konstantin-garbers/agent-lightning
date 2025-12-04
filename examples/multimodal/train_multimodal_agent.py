@@ -25,6 +25,7 @@ from  multimodal_agent import LitMultimodalAgent
 
 import agentlightning as agl
 
+
 RL_TRAINING_CONFIG: Dict[str, Any] = {
     "algorithm": {
         "adv_estimator": "grpo",
@@ -34,7 +35,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         "train_files": "data/train_set.parquet",
         "val_files": "data/validation_set.parquet",
         "train_batch_size": 32,
-        "max_prompt_length": 4096,
+        "max_prompt_length":16384, 
         "max_response_length": 4096,
         "truncation": "error",
     },
@@ -44,7 +45,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
             "tensor_model_parallel_size": 1,
             # Number of rollouts per task. Used in GRPO to calculate advantages.
             "n": 4,
-            "log_prob_micro_batch_size_per_gpu": 4,
+            "log_prob_micro_batch_size_per_gpu": 1,
             "multi_turn": {"format": "hermes"},
             "gpu_memory_utilization": 0.6,
             "name": "vllm",
@@ -58,7 +59,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         },
         "actor": {
             "ppo_mini_batch_size": 32,
-            "ppo_micro_batch_size_per_gpu": 4,
+            "ppo_micro_batch_size_per_gpu": 1,
             "optim": {"lr": 1e-6},
             "use_kl_loss": False,
             "kl_loss_coef": 0.0,
