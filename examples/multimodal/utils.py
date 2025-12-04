@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,6 +17,11 @@ from agentlightning import configure_logger
 from mcp.types import CallToolResult
 
 logger = configure_logger()
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - Pillow should be available, but guard just in case
+    Image = None  # type: ignore
 
 
 def save_screenshot(
@@ -73,6 +79,42 @@ def save_screenshot(
     except Exception as e:
         logger.warning(f"Failed to save screenshot: {e}")
         return None
+
+
+def resize_base64_image(
+    base64_data: str,
+    scale: float,
+    debug: bool = False,
+) -> str:
+    """Resize a base64-encoded image by the provided scale factor.
+    
+    Args:
+        base64_data: Base64 encoded source image.
+        scale: Factor to resize with (0 < scale < 1 reduces size).
+        debug: Whether to log debug information.
+    """
+    if not base64_data or Image is None:
+        return base64_data
+    
+    if scale <= 0 or scale >= 1:
+        return base64_data
+    
+    try:
+        image_bytes = base64.b64decode(base64_data)
+        with BytesIO(image_bytes) as input_buffer:
+            with Image.open(input_buffer) as image:
+                new_width = max(1, int(image.width * scale))
+                new_height = max(1, int(image.height * scale))
+                resized = image.resize((new_width, new_height), Image.LANCZOS)
+                
+                with BytesIO() as output_buffer:
+                    resized.save(output_buffer, format=image.format or "JPEG")
+                    resized_bytes = output_buffer.getvalue()
+        return base64.b64encode(resized_bytes).decode("utf-8")
+    except Exception as e:
+        if debug:
+            logger.warning(f"Failed to resize screenshot: {e}")
+        return base64_data
 
 
 def parse_mcp_content(response: CallToolResult, content_type: str = "text") -> list[str]:

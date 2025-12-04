@@ -35,7 +35,6 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
         "train_files": "data/train_set.parquet",
         "val_files": "data/validation_set.parquet",
         "train_batch_size": 32,
-        "max_prompt_length":16384, 
         "max_response_length": 4096,
         "truncation": "error",
     },
@@ -54,6 +53,7 @@ RL_TRAINING_CONFIG: Dict[str, Any] = {
                 "vllm": {
                     "enable_auto_tool_choice": True,
                     "tool_call_parser": "hermes",
+                    "max_model_len": 16384,
                 }
             },
         },
@@ -125,10 +125,15 @@ def config_train_qwen() -> Dict[str, Any]:
     config = deepcopy(RL_TRAINING_CONFIG)
     return config
 
-def train(config: Dict[str, Any], active_agent: Optional[str], output_folder: Optional[str] = None) -> None:
+def train(
+    config: Dict[str, Any],
+    active_agent: Optional[str],
+    output_folder: Optional[str] = None,
+    screenshot_resize: Optional[float] = None,
+) -> None:
     """Train the multimodal agent with the given configuration."""
 
-    agent = LitMultimodalAgent(output_folder=output_folder)
+    agent = LitMultimodalAgent(output_folder=output_folder, screenshot_resize=screenshot_resize)
     algorithm = agl.VERL(config)
     # Use create_trainer to get a trainer with hooks pre-configured
     trainer = LitMultimodalAgent.create_trainer(
@@ -172,6 +177,14 @@ def main() -> None:
         help="Folder path to save screenshot images as JPG files (default: ./screenshots)",
     )
 
+    parser.add_argument(
+        "--screenshot-resize",
+        type=float,
+        default=None,
+        metavar="SCALE",
+        help="Optional scale factor (0 < SCALE < 1) to shrink screenshots before saving/sending.",
+    )
+
     args = parser.parse_args()
 
     # Get the appropriate configuration
@@ -184,13 +197,19 @@ def main() -> None:
 
     # Determine output folder based on save-screenshot flag
     output_folder = args.screenshot_output_folder if args.save_screenshot else None
+    resize_factor = args.screenshot_resize
+
+    if resize_factor is not None and not (0 < resize_factor < 1):
+        parser.error("--screenshot-resize must be between 0 and 1 (exclusive)")
 
     print(f"Starting training with '{args.config}' configuration...")
     print(f"Active agent: {active_agent}")
     if args.save_screenshot:
         print(f"Screenshots will be saved to: {output_folder}")
+        if resize_factor is not None:
+            print(f"Screenshots will be resized by a factor of {resize_factor}")
 
-    train(config, active_agent, output_folder)
+    train(config, active_agent, output_folder, resize_factor)
 
 
 if __name__ == "__main__":

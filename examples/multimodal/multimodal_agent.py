@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from utils import (
     call_tool_result_to_tool_message,
     parse_mcp_content,
+    resize_base64_image,
     save_screenshot,
     truncate_message_history,
 )
@@ -57,6 +58,7 @@ class MultiModalAgent:
         rollout_id: str | None = None,
         tool_message_truncate: Optional[int] = None,
         message_history_limit: Optional[int] = 5,
+        screenshot_resize: Optional[float] = None,
     ):
         self.debug = debug
         self.max_turns = max_turns
@@ -68,6 +70,7 @@ class MultiModalAgent:
         self.rollout_id = rollout_id
         self.tool_message_truncate = tool_message_truncate
         self.message_history_limit = message_history_limit
+        self.screenshot_resize = screenshot_resize
         
         if verl_replacement is not None:
             self.model_name: str = verl_replacement["model"]  # type: ignore
@@ -99,9 +102,13 @@ class MultiModalAgent:
             tool_choice="required",
         )  # type: ignore
 
+        
+
 
     async def agent_node(self, state: State) -> dict["str", Any]:
         current_turns = state.get("num_turns", 0) + 1
+
+        prompt: Any | None = None
 
         try:
             messages = state.get("messages", [])  # type: ignore
@@ -112,7 +119,7 @@ class MultiModalAgent:
             else:
                 messages_for_prompt = messages
 
-            prompt: Any = AGENT_PROMPT.invoke(  # type: ignore
+            prompt = AGENT_PROMPT.invoke(  # type: ignore
                 {
                     "task": state["task"],  # type: ignore
                     "messages": messages_for_prompt,
@@ -125,6 +132,8 @@ class MultiModalAgent:
         except Exception as e:
             err_msg = f"Agent node failed: {e}"
             logger.exception(err_msg)
+            if prompt is not None:
+                logger.info("The following prompt failed: %s", prompt)
             error_message = HumanMessage(content=err_msg)
             return {
                 "messages": [error_message],
@@ -166,6 +175,9 @@ class MultiModalAgent:
         if not base64_data:
             logger.warning("No image data found in screenshot response")
             return {"messages": []}
+
+        if self.screenshot_resize:
+            base64_data = resize_base64_image(base64_data, self.screenshot_resize, self.debug)
 
         image_url = f"data:{media_type};base64,{base64_data}"
         
@@ -237,7 +249,8 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         debug: bool = False,
         output_folder: str | None = None,
         tool_message_truncate: Optional[int] = None,
-        message_history_limit: int | None = None,
+        message_history_limit: int = 5,
+        screenshot_resize: Optional[float] = None,
     ) -> None:
         super().__init__()
         self.val_temperature = val_temperature
@@ -246,6 +259,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.output_folder = output_folder
         self.tool_message_truncate = tool_message_truncate
         self.message_history_limit = message_history_limit
+        self.screenshot_resize = screenshot_resize
         # Store session info per rollout (set up by hook, used in rollout_async, cleaned up by hook)
         self._rollout_sessions: Dict[str, Dict[str, Any]] = {}
     
@@ -326,6 +340,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 rollout_id=rollout_id,
                 tool_message_truncate=self.tool_message_truncate,
                 message_history_limit=self.message_history_limit,
+                screenshot_resize=self.screenshot_resize,
             ).graph()
 
             try:
