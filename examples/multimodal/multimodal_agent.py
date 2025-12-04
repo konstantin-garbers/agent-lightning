@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 import os
@@ -59,6 +60,7 @@ class MultiModalAgent:
         tool_message_truncate: Optional[int] = None,
         message_history_limit: Optional[int] = 5,
         screenshot_resize: Optional[float] = None,
+        screenshot_retry_attempts: int = 2,
     ):
         self.debug = debug
         self.max_turns = max_turns
@@ -71,6 +73,7 @@ class MultiModalAgent:
         self.tool_message_truncate = tool_message_truncate
         self.message_history_limit = message_history_limit
         self.screenshot_resize = screenshot_resize
+        self.screenshot_retry_attempts = max(1, screenshot_retry_attempts)
         
         if verl_replacement is not None:
             self.model_name: str = verl_replacement["model"]  # type: ignore
@@ -157,24 +160,47 @@ class MultiModalAgent:
             return ToolMessage(content=err_msg, tool_call_id=tool_call_id)
 
     async def screenshot_node(self, state: State) -> dict["str", Any]:
-        try:
-            response = await self.session.call_tool(
-                name="desktop_screenshot",
-                arguments={},
-            )
-        except Exception as e:
-            logger.error(f"Screenshot failed: {e}")
-            # Return an error message for the agent
-            error_msg = HumanMessage(content=f"Error taking screenshot: {e}")
-            return {"messages": [error_msg]}
-
         media_type = "image/jpeg"
-        image_data_list = parse_mcp_content(response, content_type="image")
-        base64_data = image_data_list[0] if image_data_list else ""
+        base64_data = ""
+        last_error: Optional[str] = None
+
+        for attempt in range(1, self.screenshot_retry_attempts + 1):
+            try:
+                response = await self.session.call_tool(
+                    name="desktop_screenshot",
+                    arguments={},
+                )
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"Screenshot attempt {attempt}/{self.screenshot_retry_attempts} failed: {e}")
+                if attempt < self.screenshot_retry_attempts:
+                    await asyncio.sleep(1)
+                continue
+
+            image_data_list = parse_mcp_content(response, content_type="image")
+            base64_data = image_data_list[0] if image_data_list else ""
+
+            if base64_data:
+                break
+
+            logger.warning(
+                "No image data found in screenshot response (attempt %s/%s)",
+                attempt,
+                self.screenshot_retry_attempts,
+            )
+            if attempt < self.screenshot_retry_attempts:
+                await asyncio.sleep(1)
 
         if not base64_data:
-            logger.warning("No image data found in screenshot response")
-            return {"messages": []}
+            if last_error:
+                error_msg = HumanMessage(
+                    content=f"Error taking screenshot after {self.screenshot_retry_attempts} attempts: {last_error}"
+                )
+            else:
+                error_msg = HumanMessage(
+                    content=f"No image data found after {self.screenshot_retry_attempts} screenshot attempts."
+                )
+            return {"messages": [error_msg]}
 
         if self.screenshot_resize:
             base64_data = resize_base64_image(base64_data, self.screenshot_resize, self.debug)
@@ -251,6 +277,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         tool_message_truncate: Optional[int] = None,
         message_history_limit: int = 5,
         screenshot_resize: Optional[float] = None,
+        screenshot_retry_attempts: int = 2,
     ) -> None:
         super().__init__()
         self.val_temperature = val_temperature
@@ -260,6 +287,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.tool_message_truncate = tool_message_truncate
         self.message_history_limit = message_history_limit
         self.screenshot_resize = screenshot_resize
+        self.screenshot_retry_attempts = screenshot_retry_attempts
         # Store session info per rollout (set up by hook, used in rollout_async, cleaned up by hook)
         self._rollout_sessions: Dict[str, Dict[str, Any]] = {}
     
@@ -341,6 +369,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 tool_message_truncate=self.tool_message_truncate,
                 message_history_limit=self.message_history_limit,
                 screenshot_resize=self.screenshot_resize,
+                screenshot_retry_attempts=self.screenshot_retry_attempts,
             ).graph()
 
             try:
