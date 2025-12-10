@@ -57,8 +57,7 @@ class MultiModalAgent:
         verl_replacement: Dict[str, Any] | None = None,
         output_folder: str | None = None,
         rollout_id: str | None = None,
-        tool_message_truncate: Optional[int] = None,
-        message_history_limit: Optional[int] = 5,
+        max_ai_tool_message_pairs: Optional[int] = 5,
         screenshot_resize: Optional[float] = None,
         screenshot_retry_attempts: int = 2,
     ):
@@ -70,10 +69,15 @@ class MultiModalAgent:
         # Automatically save screenshots when debug is enabled
         self.output_folder = output_folder or ("./screenshots" if debug else None)
         self.rollout_id = rollout_id
-        self.tool_message_truncate = tool_message_truncate
-        self.message_history_limit = message_history_limit
+        self.max_ai_tool_message_pairs = max_ai_tool_message_pairs
         self.screenshot_resize = screenshot_resize
         self.screenshot_retry_attempts = max(1, screenshot_retry_attempts)
+
+        if self.screenshot_resize is not None:
+            logger.info(
+                "Screenshot resize is enabled (factor=%s); shrinking images can reduce GUI grounding fidelity.",
+                self.screenshot_resize,
+            )
         
         if verl_replacement is not None:
             self.model_name: str = verl_replacement["model"]  # type: ignore
@@ -104,9 +108,7 @@ class MultiModalAgent:
             tools=tools,
             tool_choice="required",
         )  # type: ignore
-
-        
-
+    
 
     async def agent_node(self, state: State) -> dict["str", Any]:
         current_turns = state.get("num_turns", 0) + 1
@@ -116,7 +118,7 @@ class MultiModalAgent:
         try:
             messages = state.get("messages", [])  # type: ignore
             screenshot_message = state.get("latest_screenshot")  # type: ignore
-            messages = truncate_message_history(messages, self.message_history_limit, self.debug)
+            messages = truncate_message_history(messages, self.max_ai_tool_message_pairs, self.debug)
             if screenshot_message is not None:
                 messages_for_prompt = [*messages, screenshot_message]
             else:
@@ -151,7 +153,7 @@ class MultiModalAgent:
             response = await self.session.call_tool(name=tool_call["name"], arguments=tool_call["args"])
 
             # Convert CallToolResult to ToolMessage using utility function
-            return call_tool_result_to_tool_message(response, tool_call_id, self.tool_message_truncate)
+            return call_tool_result_to_tool_message(response, tool_call_id)
 
         except Exception as e:
             err_msg = f"Tool call {tool_call['name']} failed: {e}"
@@ -274,8 +276,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         max_turns: int = 10,
         debug: bool = False,
         output_folder: str | None = None,
-        tool_message_truncate: Optional[int] = None,
-        message_history_limit: int = 5,
+        max_ai_tool_message_pairs: int = 5,
         screenshot_resize: Optional[float] = None,
         screenshot_retry_attempts: int = 2,
     ) -> None:
@@ -284,8 +285,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
         self.max_turns = max_turns
         self.debug = debug
         self.output_folder = output_folder
-        self.tool_message_truncate = tool_message_truncate
-        self.message_history_limit = message_history_limit
+        self.max_ai_tool_message_pairs = max_ai_tool_message_pairs
         self.screenshot_resize = screenshot_resize
         self.screenshot_retry_attempts = screenshot_retry_attempts
         # Store session info per rollout (set up by hook, used in rollout_async, cleaned up by hook)
@@ -366,8 +366,7 @@ class LitMultimodalAgent(LitAgent[Dict[str, Any]]):
                 ),
                 output_folder=self.output_folder,
                 rollout_id=rollout_id,
-                tool_message_truncate=self.tool_message_truncate,
-                message_history_limit=self.message_history_limit,
+                max_ai_tool_message_pairs=self.max_ai_tool_message_pairs,
                 screenshot_resize=self.screenshot_resize,
                 screenshot_retry_attempts=self.screenshot_retry_attempts,
             ).graph()
@@ -485,9 +484,10 @@ def debug_multimodal_agent():
         },
     )
 
-    agent = LitMultimodalAgent(debug=True, max_turns=5)
+    agent = LitMultimodalAgent(debug=True, max_turns=10)
     trainer = LitMultimodalAgent.create_trainer(
-        n_workers=6,
+        n_runners = 2,
+        max_rollouts = 2,
         initial_resources={"main_llm": agent_llm, "evaluation_llm": evaluation_llm},
     )
     trainer.dev(agent, df)

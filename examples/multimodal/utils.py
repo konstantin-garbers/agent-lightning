@@ -9,7 +9,14 @@ import json
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
+
+try:
+    from langchain_core.messages import AIMessage  # type: ignore
+    _AIMessageCls: Any = AIMessage
+except Exception:  # pragma: no cover - fallback for optional dep
+    AIMessage = Any  # type: ignore
+    _AIMessageCls = tuple()  # type: ignore[var-annotated]  # empty tuple makes isinstance checks always False
 
 from langchain_core.messages import ToolMessage
 
@@ -17,11 +24,6 @@ from agentlightning import configure_logger
 from mcp.types import CallToolResult
 
 logger = configure_logger()
-
-try:
-    from PIL import Image
-except ImportError:  # pragma: no cover - Pillow should be available, but guard just in case
-    Image = None  # type: ignore
 
 
 def save_screenshot(
@@ -93,23 +95,30 @@ def resize_base64_image(
         scale: Factor to resize with (0 < scale < 1 reduces size).
         debug: Whether to log debug information.
     """
-    if not base64_data or Image is None:
+    if not base64_data:
         return base64_data
     
     if scale <= 0 or scale >= 1:
         return base64_data
     
     try:
+        try:
+            from PIL import Image  # type: ignore
+            Image = cast(Any, Image)
+        except ImportError:  # pragma: no cover - Pillow should be available, but guard just in case
+            return base64_data
+
         image_bytes = base64.b64decode(base64_data)
         with BytesIO(image_bytes) as input_buffer:
-            with Image.open(input_buffer) as image:
-                new_width = max(1, int(image.width * scale))
-                new_height = max(1, int(image.height * scale))
-                resized = image.resize((new_width, new_height), Image.LANCZOS)
-                
-                with BytesIO() as output_buffer:
-                    resized.save(output_buffer, format=image.format or "JPEG")
-                    resized_bytes = output_buffer.getvalue()
+            image = Image.open(input_buffer)  # type: ignore[operator]
+            new_width = max(1, int(image.width * scale))
+            new_height = max(1, int(image.height * scale))
+            filter_to_use = getattr(Image, "LANCZOS", None)
+            resized = image.resize((new_width, new_height), filter_to_use)  # type: ignore[call-arg]
+            
+            with BytesIO() as output_buffer:
+                resized.save(output_buffer, format=getattr(image, "format", None) or "JPEG")
+                resized_bytes = output_buffer.getvalue()
         return base64.b64encode(resized_bytes).decode("utf-8")
     except Exception as e:
         if debug:
@@ -134,7 +143,7 @@ def parse_mcp_content(response: CallToolResult, content_type: str = "text") -> l
     for mcp_block in response.content:
         data_key = "text" if content_type == "text" else "data"
 
-        if isinstance(mcp_block, dict):
+        if isinstance(mcp_block, dict):  # type: ignore[reportUnnecessaryIsInstance]
             if mcp_block.get("type") == content_type:  # type: ignore
                 data_blocks.append(mcp_block.get(data_key, ""))  # type: ignore
         elif getattr(mcp_block, "type", None) == content_type:
@@ -143,32 +152,15 @@ def parse_mcp_content(response: CallToolResult, content_type: str = "text") -> l
     return data_blocks  # type: ignore
 
 
-def truncate_tool_message(content: str, max_length: int) -> str:
-    """Truncate tool message content to a reasonable length.
-    
-    Args:
-        content: The content to truncate
-        max_length: Maximum length before truncation
-        
-    Returns:
-        Truncated content with "... (truncated)" suffix if needed
-    """
-    if len(content) > max_length:
-        return content[:max_length] + "\n... (truncated)"
-    return content
-
-
 def call_tool_result_to_tool_message(
     response: CallToolResult,
     original_tool_call_id: str,
-    tool_message_truncate: Optional[int] = None,
 ) -> ToolMessage:
     """Convert a CallToolResult to a ToolMessage.
     
     Args:
         response: CallToolResult from MCP tool call
         original_tool_call_id: The tool call ID to associate with the message
-        tool_message_truncate: Maximum length for tool message content
         
     Returns:
         ToolMessage with parsed and truncated content
@@ -177,8 +169,6 @@ def call_tool_result_to_tool_message(
 
     if text_blocks:
         content_str = json.dumps(text_blocks)
-        if tool_message_truncate is not None:
-            content_str = truncate_tool_message(content_str, max_length=tool_message_truncate)
     else:
         content_str = "No text output from tool."
 
@@ -187,29 +177,53 @@ def call_tool_result_to_tool_message(
 
 def truncate_message_history(
     messages: list[Any],
-    message_history_limit: Optional[int] = None,
+    max_ai_tool_message_pairs: Optional[int] = None,
     debug: bool = False,
 ) -> list[Any]:
-    """Truncate message history to keep only recent messages if limit is set.
+    """Keep only the most recent AI/Tool message pairs.
     
     Args:
-        messages: List of messages to truncate
-        message_history_limit: Maximum number of messages to keep (None for no limit)
-        debug: Whether to log debug messages
+        messages: Full message history.
+        max_ai_tool_message_pairs: Max number of (AIMessage + following ToolMessage(s)) blocks to keep.
+        debug: Whether to log truncation.
         
     Returns:
-        Truncated list of messages (preserves first message and most recent messages)
+        Flattened list containing only the most recent AI/Tool pairs up to the limit.
     """
-    if message_history_limit is None or len(messages) <= message_history_limit:
+    if max_ai_tool_message_pairs is None:
         return messages
-    
-    # Keep the first message (usually the task/system message) and the most recent messages
-    # This preserves context while limiting size
-    if len(messages) > 1:
-        # Keep first message and last (message_history_limit - 1) messages
-        truncated = [messages[0]] + messages[-(message_history_limit - 1):]
-        if debug:
-            logger.info(f"Truncated message history from {len(messages)} to {len(truncated)} messages")
-        return truncated
-    return messages
+
+    pairs: list[list[Any]] = []
+    current_pair: list[Any] = []
+
+    for msg in messages:
+        if isinstance(msg, ToolMessage):
+            if current_pair:
+                current_pair.append(msg)
+            # Orphan tool messages without a preceding AI message are dropped.
+            continue
+
+        if isinstance(msg, _AIMessageCls):
+            if current_pair:
+                pairs.append(current_pair)
+            current_pair = [msg]
+            continue
+
+        # Drop non-AI/Tool messages from the truncation buffer.
+        continue
+
+    if current_pair:
+        pairs.append(current_pair)
+
+    kept_pairs = pairs[-max_ai_tool_message_pairs :]
+    truncated_messages = [m for pair in kept_pairs for m in pair]
+
+    if debug and len(truncated_messages) != len(messages):
+        logger.info(
+            "Truncated message history to %s AI/Tool pairs (from %s messages to %s messages)",
+            max_ai_tool_message_pairs,
+            len(messages),
+            len(truncated_messages),
+        )
+    return truncated_messages
 
